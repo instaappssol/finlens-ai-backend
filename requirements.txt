@@ -6,3 +6,5 @@ python-dotenv
 pymongo
 email-validator
 bcrypt
+pydantic[email]
+PyJWT

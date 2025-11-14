@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from pymongo import MongoClient
-from app.api.v1.auth_controller import router as auth_router
 from app.core.config import settings
+from app.api.routes import router
+from app.core.handlers import register_exception_handlers
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,7 +39,10 @@ app = FastAPI(
     ],
 )
 
-app.include_router(auth_router)
+# Register exception handlers
+register_exception_handlers(app)
+
+app.include_router(router)
 
 @app.get("/health", tags=["health"], summary="Health Check", description="Check if the API is running")
 def health():
