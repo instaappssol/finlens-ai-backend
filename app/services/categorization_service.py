@@ -5,23 +5,17 @@ Wraps the transaction categorization model for use in the API.
 Handles model loading, prediction, and training.
 """
 
-import sys
-from pathlib import Path
 from typing import Dict, Any, List, Optional
 import pandas as pd
 
-# Add docs directory to path to import the model
-docs_path = Path(__file__).parent.parent.parent / "docs"
-sys.path.insert(0, str(docs_path))
-
 from app.services.model_manager import ModelManager
 
-# Import the model from docs directory
+# Import the ML model from app.ml
 try:
-    from transaction_model import TransactionCategorizer, PredictionResult
+    from app.ml.transaction_categorizer import TransactionCategorizer, PredictionResult
 except ImportError as e:
     # Fallback if import fails
-    print(f"Warning: Could not import TransactionCategorizer from docs/transaction_model.py: {e}")
+    print(f"Warning: Could not import TransactionCategorizer from app.ml.transaction_categorizer: {e}")
     TransactionCategorizer = None
     PredictionResult = None
 

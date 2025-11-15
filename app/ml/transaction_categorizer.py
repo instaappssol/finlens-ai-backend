@@ -1,5 +1,5 @@
 """
-transaction_model.py
+Transaction Categorizer ML Model
 
 In-house AI-powered financial transaction categorisation.
 
@@ -11,7 +11,7 @@ Implements:
 - Hook for SHAP/XAI
 - Taxonomy alignment
 
-Target: acts as the core of the Inference Service.
+This is the core ML model for transaction categorization.
 """
 
 from __future__ import annotations

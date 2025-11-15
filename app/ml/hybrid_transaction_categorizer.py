@@ -1,3 +1,10 @@
+"""
+Hybrid Transaction Categorizer ML Model
+
+Advanced neural network-based transaction categorization using
+Sentence Transformers for text features and traditional ML for tabular features.
+"""
+
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional
