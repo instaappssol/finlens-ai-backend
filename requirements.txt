@@ -15,3 +15,5 @@ scikit-learn
 pandas
 numpy
 joblib
+torch
+sentence_transformers

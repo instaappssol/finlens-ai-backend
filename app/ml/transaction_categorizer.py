@@ -30,7 +30,6 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, f1_score
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
 import joblib
 
 # -----------------------------------------------------------------------------
@@ -50,6 +49,7 @@ DEFAULT_TAXONOMY = {
 # -----------------------------------------------------------------------------
 # 2. PREPROCESSING & ENRICHMENT
 # -----------------------------------------------------------------------------
+
 
 class TransactionPreprocessor:
     COMMON_PREFIXES = [
@@ -88,7 +88,9 @@ class TransactionPreprocessor:
         out["canonical_merchant"] = self.normalize_merchant(desc)
 
         text = out["clean_description"]
-        is_p2p = any(k in text for k in ["to", "from"]) and row.get("transaction_type", "").lower() in (
+        is_p2p = any(k in text for k in ["to", "from"]) and row.get(
+            "transaction_type", ""
+        ).lower() in (
             "p2p_transfer",
             "p2p",
             "transfer",
@@ -112,6 +114,7 @@ class TransactionPreprocessor:
 # -----------------------------------------------------------------------------
 # 3. FEATURE BUILDER
 # -----------------------------------------------------------------------------
+
 
 class FeatureBuilder:
     def __init__(self):
@@ -138,7 +141,9 @@ class FeatureBuilder:
 
     def transform(self, df: pd.DataFrame) -> np.ndarray:
         if self.ct is None:
-            raise RuntimeError("FeatureBuilder not fitted. Call build_transformer() first.")
+            raise RuntimeError(
+                "FeatureBuilder not fitted. Call build_transformer() first."
+            )
         return self.ct.transform(df)
 
     def get_feature_names(self) -> List[str]:
@@ -160,6 +165,7 @@ class FeatureBuilder:
 # -----------------------------------------------------------------------------
 # 4. MODEL WRAPPER
 # -----------------------------------------------------------------------------
+
 
 @dataclass
 class PredictionResult:
@@ -206,10 +212,14 @@ class TransactionCategorizer:
         # Stratification requires at least 2 samples per class
         min_class_count = y.value_counts().min()
         if min_class_count >= 2:
-            X_tr, X_te, y_tr, y_te = train_test_split(X_vec, y, test_size=0.2, random_state=42, stratify=y)
+            X_tr, X_te, y_tr, y_te = train_test_split(
+                X_vec, y, test_size=0.2, random_state=42, stratify=y
+            )
         else:
             # Not enough samples per class for stratification
-            X_tr, X_te, y_tr, y_te = train_test_split(X_vec, y, test_size=0.2, random_state=42)
+            X_tr, X_te, y_tr, y_te = train_test_split(
+                X_vec, y, test_size=0.2, random_state=42
+            )
         self.model.fit(X_tr, y_tr)
         y_pred = self.model.predict(X_te)
         print("Classification report:\n", classification_report(y_te, y_pred))

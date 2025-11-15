@@ -106,7 +106,6 @@ class CategorizationService:
 
         # Set defaults
         transaction.setdefault("transaction_type", "UNKNOWN")
-        transaction.setdefault("currency", "INR")
         transaction.setdefault("timestamp", "")
 
         # Predict
