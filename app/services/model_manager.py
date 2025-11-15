@@ -3,14 +3,12 @@ Model Manager Service
 
 Handles saving and loading of trained ML models using joblib/pickle.
 Supports both scikit-learn and PyTorch models.
-Supports MongoDB GridFS for persistent storage across deployments.
+Uses MongoDB GridFS for persistent storage.
 """
 
-import os
 import io
 import joblib
 import pickle
-from pathlib import Path
 from typing import Optional, Any, Dict
 from datetime import datetime
 import json
@@ -21,75 +19,53 @@ GRIDFS_AVAILABLE = True
 
 
 class ModelManager:
-    """Manages model persistence - save, load, and versioning"""
+    """Manages model persistence - save, load, and versioning using MongoDB GridFS"""
 
     def __init__(
         self,
-        models_dir: str = "models",
         db: Optional[Database] = None,
         use_gridfs: bool = True,
     ):
         """
-        Initialize ModelManager with storage directory.
+        Initialize ModelManager with MongoDB GridFS storage.
 
         Args:
-            models_dir: Directory path for storing model files (used for local cache)
-            db: Optional MongoDB database connection for GridFS storage
+            db: MongoDB database connection for GridFS storage (required)
             use_gridfs: If True and db is provided, use GridFS for persistent storage
         """
-        self.models_dir = Path(models_dir)
-        self.models_dir.mkdir(exist_ok=True)
-        self.metadata_file = self.models_dir / "model_metadata.json"
+        if db is None:
+            raise ValueError("MongoDB database connection is required. GridFS storage is mandatory.")
 
         # GridFS setup
         self.db = db
-        self.use_gridfs = use_gridfs and db is not None and GRIDFS_AVAILABLE
-        if self.use_gridfs:
-            self.gridfs = GridFS(db, collection="models")
-            # Also store metadata in MongoDB
-            self.metadata_collection = db["model_metadata"]
-        else:
-            self.gridfs = None
-            self.metadata_collection = None
+        self.use_gridfs = use_gridfs and GRIDFS_AVAILABLE
+        if not self.use_gridfs:
+            raise ValueError("GridFS is required but not available. Please ensure pymongo and gridfs are installed.")
+        
+        self.gridfs = GridFS(db, collection="models")
+        # Also store metadata in MongoDB
+        self.metadata_collection = db["model_metadata"]
 
     def _get_metadata(self) -> Dict[str, Any]:
-        """Load model metadata from MongoDB or JSON file"""
-        if self.use_gridfs and self.metadata_collection is not None:
-            try:
-                doc = self.metadata_collection.find_one({"_id": "model_metadata"})
-                if doc:
-                    return doc.get("metadata", {})
-            except Exception as e:
-                print(f"Error loading metadata from MongoDB: {e}, falling back to file")
-
-        # Fallback to file
-        if self.metadata_file.exists():
-            try:
-                with open(self.metadata_file, "r") as f:
-                    return json.load(f)
-            except Exception:
-                pass
+        """Load model metadata from MongoDB"""
+        try:
+            doc = self.metadata_collection.find_one({"_id": "model_metadata"})
+            if doc:
+                return doc.get("metadata", {})
+        except Exception as e:
+            print(f"Error loading metadata from MongoDB: {e}")
         return {}
 
     def _save_metadata(self, metadata: Dict[str, Any]):
-        """Save model metadata to MongoDB and/or JSON file"""
-        # Save to MongoDB if available
-        if self.use_gridfs and self.metadata_collection is not None:
-            try:
-                self.metadata_collection.update_one(
-                    {"_id": "model_metadata"},
-                    {"$set": {"metadata": metadata, "updated_at": datetime.utcnow()}},
-                    upsert=True,
-                )
-            except Exception as e:
-                print(f"Error saving metadata to MongoDB: {e}, saving to file only")
-
-        # Always save to file as backup
+        """Save model metadata to MongoDB"""
         try:
-            with open(self.metadata_file, "w") as f:
-                json.dump(metadata, f, indent=2)
+            self.metadata_collection.update_one(
+                {"_id": "model_metadata"},
+                {"$set": {"metadata": metadata, "updated_at": datetime.utcnow()}},
+                upsert=True,
+            )
         except Exception as e:
-            print(f"Error saving metadata to file: {e}")
+            print(f"Error saving metadata to MongoDB: {e}")
 
     def save_model(
         self,
@@ -100,7 +76,7 @@ class ModelManager:
         use_joblib: bool = True,
     ) -> str:
         """
-        Save a trained model to GridFS (if available) and local disk cache.
+        Save a trained model to GridFS.
 
         Args:
             model: The model object to save (scikit-learn, PyTorch, etc.)
@@ -110,12 +86,11 @@ class ModelManager:
             use_joblib: If True, use joblib (better for scikit-learn), else use pickle
 
         Returns:
-            Path to saved model file (or GridFS filename)
+            GridFS filename
         """
         # Create filename
         extension = ".joblib" if use_joblib else ".pkl"
-        filename = f"{model_name}_{version}{extension}"
-        filepath = self.models_dir / filename
+        gridfs_filename = f"{model_name}/{version}{extension}"
 
         # Serialize model to bytes
         model_bytes = io.BytesIO()
@@ -126,38 +101,27 @@ class ModelManager:
         model_bytes.seek(0)
         model_data = model_bytes.read()
 
-        # Save to GridFS if available
-        gridfs_filename = None
-        if self.use_gridfs and self.gridfs is not None:
-            try:
-                gridfs_filename = f"{model_name}/{version}{extension}"
-                # Delete existing file if it exists
-                try:
-                    existing = self.gridfs.find_one({"filename": gridfs_filename})
-                    if existing is not None:
-                        self.gridfs.delete(existing._id)
-                except Exception:
-                    pass
-
-                # Save to GridFS
-                self.gridfs.put(
-                    model_data,
-                    filename=gridfs_filename,
-                    model_name=model_name,
-                    version=version,
-                    metadata=json.dumps(metadata or {}),
-                    upload_date=datetime.utcnow(),
-                )
-                print(f"Model saved to GridFS: {gridfs_filename}")
-            except Exception as e:
-                print(f"Error saving to GridFS: {e}, saving to local only")
-
-        # Always save to local disk as cache
+        # Delete existing file if it exists
         try:
-            with open(filepath, "wb") as f:
-                f.write(model_data)
+            existing = self.gridfs.find_one({"filename": gridfs_filename})
+            if existing is not None:
+                self.gridfs.delete(existing._id)
+        except Exception:
+            pass
+
+        # Save to GridFS
+        try:
+            self.gridfs.put(
+                model_data,
+                filename=gridfs_filename,
+                model_name=model_name,
+                version=version,
+                metadata=json.dumps(metadata or {}),
+                upload_date=datetime.utcnow(),
+            )
+            print(f"Model saved to GridFS: {gridfs_filename}")
         except Exception as e:
-            print(f"Error saving to local cache: {e}")
+            raise RuntimeError(f"Error saving to GridFS: {e}") from e
 
         # Update metadata
         meta = self._get_metadata()
@@ -165,12 +129,11 @@ class ModelManager:
             meta[model_name] = {}
 
         meta[model_name][version] = {
-            "filepath": str(filepath),
             "gridfs_filename": gridfs_filename,
             "saved_at": datetime.utcnow().isoformat(),
             "version": version,
             "metadata": metadata or {},
-            "stored_in_gridfs": self.use_gridfs and gridfs_filename is not None,
+            "stored_in_gridfs": True,
         }
 
         # Mark as latest if version is "latest"
@@ -179,7 +142,7 @@ class ModelManager:
 
         self._save_metadata(meta)
 
-        return str(filepath) if filepath.exists() else (gridfs_filename or filename)
+        return gridfs_filename
 
     def load_model(
         self,
@@ -188,7 +151,7 @@ class ModelManager:
         use_joblib: bool = True,
     ) -> Any:
         """
-        Load a saved model from GridFS (if available) or local disk.
+        Load a saved model from GridFS.
 
         Args:
             model_name: Name identifier for the model
@@ -205,7 +168,7 @@ class ModelManager:
         meta = self._get_metadata()
 
         # If metadata is empty, try to load from GridFS directly
-        if not meta and self.use_gridfs and self.gridfs is not None:
+        if not meta:
             try:
                 # Try to find model in GridFS
                 grid_file = self.gridfs.find_one(
@@ -250,50 +213,33 @@ class ModelManager:
             raise ValueError(f"Version '{version}' not found for model '{model_name}'")
 
         version_info = meta[model_name][version]
-        filepath = Path(version_info.get("filepath", ""))
         gridfs_filename = version_info.get("gridfs_filename")
 
-        # Try to load from local cache first
-        if filepath and filepath.exists():
-            try:
-                if use_joblib or filepath.suffix == ".joblib":
-                    return joblib.load(filepath)
-                else:
-                    with open(filepath, "rb") as f:
-                        return pickle.load(f)
-            except Exception as e:
-                print(f"Error loading from local cache: {e}, trying GridFS")
+        if not gridfs_filename:
+            raise FileNotFoundError(
+                f"GridFS filename not found for model '{model_name}' version '{version}'"
+            )
 
-        # Load from GridFS if available
-        if self.use_gridfs and self.gridfs is not None and gridfs_filename:
-            try:
-                grid_file = self.gridfs.find_one({"filename": gridfs_filename})
-                if grid_file is not None:
-                    model_data = grid_file.read()
+        # Load from GridFS
+        try:
+            grid_file = self.gridfs.find_one({"filename": gridfs_filename})
+            if grid_file is None:
+                raise FileNotFoundError(
+                    f"Model file not found in GridFS: {gridfs_filename}"
+                )
+            
+            model_data = grid_file.read()
 
-                    # Save to local cache for next time
-                    if filepath:
-                        try:
-                            with open(filepath, "wb") as f:
-                                f.write(model_data)
-                        except Exception:
-                            pass
-
-                    # Load from bytes
-                    model_bytes = io.BytesIO(model_data)
-                    if use_joblib or gridfs_filename.endswith(".joblib"):
-                        return joblib.load(model_bytes)
-                    else:
-                        return pickle.load(model_bytes)
-            except Exception as e:
-                print(f"Error loading from GridFS: {e}")
-
-        # If we get here, model not found
-        raise FileNotFoundError(
-            f"Model file not found: {filepath or gridfs_filename}. "
-            f"Local cache: {filepath.exists() if filepath else False}, "
-            f"GridFS: {gridfs_filename or 'N/A'}"
-        )
+            # Load from bytes
+            model_bytes = io.BytesIO(model_data)
+            if use_joblib or gridfs_filename.endswith(".joblib"):
+                return joblib.load(model_bytes)
+            else:
+                return pickle.load(model_bytes)
+        except Exception as e:
+            raise FileNotFoundError(
+                f"Error loading model from GridFS: {e}"
+            ) from e
 
     def get_model_info(self, model_name: str) -> Dict[str, Any]:
         """
@@ -323,7 +269,7 @@ class ModelManager:
 
     def delete_model(self, model_name: str, version: Optional[str] = None):
         """
-        Delete a model file and its metadata from both GridFS and local cache.
+        Delete a model file and its metadata from GridFS.
 
         Args:
             model_name: Name identifier for the model
@@ -339,11 +285,7 @@ class ModelManager:
             for v, info in meta[model_name].items():
                 if v != "current":
                     # Delete from GridFS
-                    if (
-                        self.use_gridfs
-                        and self.gridfs is not None
-                        and info.get("gridfs_filename")
-                    ):
+                    if info.get("gridfs_filename"):
                         try:
                             grid_file = self.gridfs.find_one(
                                 {"filename": info["gridfs_filename"]}
@@ -352,12 +294,6 @@ class ModelManager:
                                 self.gridfs.delete(grid_file._id)
                         except Exception as e:
                             print(f"Error deleting from GridFS: {e}")
-
-                    # Delete local file
-                    if "filepath" in info:
-                        filepath = Path(info["filepath"])
-                        if filepath.exists():
-                            filepath.unlink()
             del meta[model_name]
         else:
             # Delete specific version
@@ -365,11 +301,7 @@ class ModelManager:
                 info = meta[model_name][version]
 
                 # Delete from GridFS
-                if (
-                    self.use_gridfs
-                    and self.gridfs is not None
-                    and info.get("gridfs_filename")
-                ):
+                if info.get("gridfs_filename"):
                     try:
                         grid_file = self.gridfs.find_one(
                             {"filename": info["gridfs_filename"]}
@@ -379,11 +311,6 @@ class ModelManager:
                     except Exception as e:
                         print(f"Error deleting from GridFS: {e}")
 
-                # Delete local file
-                if "filepath" in info:
-                    filepath = Path(info["filepath"])
-                    if filepath.exists():
-                        filepath.unlink()
                 del meta[model_name][version]
 
         self._save_metadata(meta)

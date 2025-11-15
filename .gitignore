@@ -155,9 +155,4 @@ logs/
 *.temp
 *.bak
 
-# ML Models
-models/*.joblib
-models/*.pkl
-models/model_metadata.json
-!models/.gitkeep
-!models/README.md
+# ML Models (now stored in MongoDB GridFS)

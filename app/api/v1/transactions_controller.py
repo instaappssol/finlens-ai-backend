@@ -38,8 +38,9 @@ def get_categorization_service(request: Optional[Request] = None) -> Categorizat
             pass
     
     if _categorization_service is None:
+        if db is None:
+            raise RuntimeError("MongoDB database connection is required for model storage")
         _categorization_service = CategorizationService(
-            models_dir=settings.MODELS_DIR,
             db=db
         )
         # Try to load existing model

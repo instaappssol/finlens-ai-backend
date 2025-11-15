@@ -20,7 +20,6 @@ class CategorizationService:
     def __init__(
         self,
         model_manager: Optional[ModelManager] = None,
-        models_dir: str = "models",
         db=None,
     ):
         """
@@ -28,12 +27,13 @@ class CategorizationService:
 
         Args:
             model_manager: Optional ModelManager instance
-            models_dir: Directory for model storage (used for local cache)
-            db: Optional MongoDB database connection for GridFS storage
+            db: MongoDB database connection for GridFS storage (required)
         """
         if model_manager is None:
+            if db is None:
+                raise ValueError("MongoDB database connection is required for GridFS storage")
             self.model_manager = ModelManager(
-                models_dir=models_dir, db=db, use_gridfs=True
+                db=db, use_gridfs=True
             )
         else:
             self.model_manager = model_manager
