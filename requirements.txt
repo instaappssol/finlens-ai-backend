@@ -8,3 +8,10 @@ email-validator
 bcrypt
 pydantic[email]
 PyJWT
+python-multipart
+
+# ML dependencies for transaction categorization
+scikit-learn
+pandas
+numpy
+joblib

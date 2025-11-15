@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = Field(..., env='JWT_SECRET_KEY')
     JWT_ALGORITHM: str = Field(default="HS256", env='JWT_ALGORITHM')
     JWT_EXPIRATION_HOURS: int = Field(default=24, env='JWT_EXPIRATION_HOURS')
+    MODELS_DIR: str = Field(default="models", env='MODELS_DIR')
 
     class Config:
         env_file = ".env"
