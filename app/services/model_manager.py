@@ -14,20 +14,21 @@ from pathlib import Path
 from typing import Optional, Any, Dict
 from datetime import datetime
 import json
+from gridfs import GridFS
+from pymongo.database import Database
 
-try:
-    from gridfs import GridFS
-    from pymongo.database import Database
-    GRIDFS_AVAILABLE = True
-except ImportError:
-    GRIDFS_AVAILABLE = False
-    Database = None
+GRIDFS_AVAILABLE = True
 
 
 class ModelManager:
     """Manages model persistence - save, load, and versioning"""
 
-    def __init__(self, models_dir: str = "models", db: Optional[Database] = None, use_gridfs: bool = True):
+    def __init__(
+        self,
+        models_dir: str = "models",
+        db: Optional[Database] = None,
+        use_gridfs: bool = True,
+    ):
         """
         Initialize ModelManager with storage directory.
 
@@ -39,7 +40,7 @@ class ModelManager:
         self.models_dir = Path(models_dir)
         self.models_dir.mkdir(exist_ok=True)
         self.metadata_file = self.models_dir / "model_metadata.json"
-        
+
         # GridFS setup
         self.db = db
         self.use_gridfs = use_gridfs and db is not None and GRIDFS_AVAILABLE
@@ -60,7 +61,7 @@ class ModelManager:
                     return doc.get("metadata", {})
             except Exception as e:
                 print(f"Error loading metadata from MongoDB: {e}, falling back to file")
-        
+
         # Fallback to file
         if self.metadata_file.exists():
             try:
@@ -78,11 +79,11 @@ class ModelManager:
                 self.metadata_collection.update_one(
                     {"_id": "model_metadata"},
                     {"$set": {"metadata": metadata, "updated_at": datetime.utcnow()}},
-                    upsert=True
+                    upsert=True,
                 )
             except Exception as e:
                 print(f"Error saving metadata to MongoDB: {e}, saving to file only")
-        
+
         # Always save to file as backup
         try:
             with open(self.metadata_file, "w") as f:
@@ -137,7 +138,7 @@ class ModelManager:
                         self.gridfs.delete(existing._id)
                 except Exception:
                     pass
-                
+
                 # Save to GridFS
                 self.gridfs.put(
                     model_data,
@@ -145,7 +146,7 @@ class ModelManager:
                     model_name=model_name,
                     version=version,
                     metadata=json.dumps(metadata or {}),
-                    upload_date=datetime.utcnow()
+                    upload_date=datetime.utcnow(),
                 )
                 print(f"Model saved to GridFS: {gridfs_filename}")
             except Exception as e:
@@ -207,19 +208,31 @@ class ModelManager:
         if not meta and self.use_gridfs and self.gridfs is not None:
             try:
                 # Try to find model in GridFS
-                grid_file = self.gridfs.find_one({"model_name": model_name, "version": version or "latest"})
+                grid_file = self.gridfs.find_one(
+                    {"model_name": model_name, "version": version or "latest"}
+                )
                 if grid_file is not None:
                     # Reconstruct metadata from GridFS
                     meta = {
                         model_name: {
-                            version or "latest": {
+                            version
+                            or "latest": {
                                 "gridfs_filename": grid_file.filename,
-                                "saved_at": grid_file.upload_date.isoformat() if hasattr(grid_file.upload_date, 'isoformat') else str(grid_file.upload_date),
+                                "saved_at": (
+                                    grid_file.upload_date.isoformat()
+                                    if hasattr(grid_file.upload_date, "isoformat")
+                                    else str(grid_file.upload_date)
+                                ),
                                 "version": version or "latest",
-                                "metadata": json.loads(grid_file.metadata) if hasattr(grid_file, 'metadata') and grid_file.metadata else {},
+                                "metadata": (
+                                    json.loads(grid_file.metadata)
+                                    if hasattr(grid_file, "metadata")
+                                    and grid_file.metadata
+                                    else {}
+                                ),
                                 "stored_in_gridfs": True,
                             },
-                            "current": version or "latest"
+                            "current": version or "latest",
                         }
                     }
                     self._save_metadata(meta)
@@ -234,9 +247,7 @@ class ModelManager:
             version = meta[model_name].get("current", "latest")
 
         if version not in meta[model_name]:
-            raise ValueError(
-                f"Version '{version}' not found for model '{model_name}'"
-            )
+            raise ValueError(f"Version '{version}' not found for model '{model_name}'")
 
         version_info = meta[model_name][version]
         filepath = Path(version_info.get("filepath", ""))
@@ -259,7 +270,7 @@ class ModelManager:
                 grid_file = self.gridfs.find_one({"filename": gridfs_filename})
                 if grid_file is not None:
                     model_data = grid_file.read()
-                    
+
                     # Save to local cache for next time
                     if filepath:
                         try:
@@ -267,7 +278,7 @@ class ModelManager:
                                 f.write(model_data)
                         except Exception:
                             pass
-                    
+
                     # Load from bytes
                     model_bytes = io.BytesIO(model_data)
                     if use_joblib or gridfs_filename.endswith(".joblib"):
@@ -301,9 +312,7 @@ class ModelManager:
         model_info = meta[model_name].copy()
         if "current" in model_info:
             current_version = model_info["current"]
-            model_info["current_version_info"] = model_info.get(
-                current_version, {}
-            )
+            model_info["current_version_info"] = model_info.get(current_version, {})
 
         return model_info
 
@@ -330,14 +339,20 @@ class ModelManager:
             for v, info in meta[model_name].items():
                 if v != "current":
                     # Delete from GridFS
-                    if self.use_gridfs and self.gridfs is not None and info.get("gridfs_filename"):
+                    if (
+                        self.use_gridfs
+                        and self.gridfs is not None
+                        and info.get("gridfs_filename")
+                    ):
                         try:
-                            grid_file = self.gridfs.find_one({"filename": info["gridfs_filename"]})
+                            grid_file = self.gridfs.find_one(
+                                {"filename": info["gridfs_filename"]}
+                            )
                             if grid_file is not None:
                                 self.gridfs.delete(grid_file._id)
                         except Exception as e:
                             print(f"Error deleting from GridFS: {e}")
-                    
+
                     # Delete local file
                     if "filepath" in info:
                         filepath = Path(info["filepath"])
@@ -348,16 +363,22 @@ class ModelManager:
             # Delete specific version
             if version in meta[model_name]:
                 info = meta[model_name][version]
-                
+
                 # Delete from GridFS
-                if self.use_gridfs and self.gridfs is not None and info.get("gridfs_filename"):
+                if (
+                    self.use_gridfs
+                    and self.gridfs is not None
+                    and info.get("gridfs_filename")
+                ):
                     try:
-                        grid_file = self.gridfs.find_one({"filename": info["gridfs_filename"]})
+                        grid_file = self.gridfs.find_one(
+                            {"filename": info["gridfs_filename"]}
+                        )
                         if grid_file is not None:
                             self.gridfs.delete(grid_file._id)
                     except Exception as e:
                         print(f"Error deleting from GridFS: {e}")
-                
+
                 # Delete local file
                 if "filepath" in info:
                     filepath = Path(info["filepath"])
@@ -366,4 +387,3 @@ class ModelManager:
                 del meta[model_name][version]
 
         self._save_metadata(meta)
-

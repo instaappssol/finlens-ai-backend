@@ -11,19 +11,18 @@ import pandas as pd
 from app.services.model_manager import ModelManager
 
 # Import the ML model from app.ml
-try:
-    from app.ml.transaction_categorizer import TransactionCategorizer, PredictionResult
-except ImportError as e:
-    # Fallback if import fails
-    print(f"Warning: Could not import TransactionCategorizer from app.ml.transaction_categorizer: {e}")
-    TransactionCategorizer = None
-    PredictionResult = None
+from app.ml.transaction_categorizer import TransactionCategorizer, PredictionResult
 
 
 class CategorizationService:
     """Service for transaction categorization using ML models"""
 
-    def __init__(self, model_manager: Optional[ModelManager] = None, models_dir: str = "models", db=None):
+    def __init__(
+        self,
+        model_manager: Optional[ModelManager] = None,
+        models_dir: str = "models",
+        db=None,
+    ):
         """
         Initialize categorization service.
 
@@ -33,7 +32,9 @@ class CategorizationService:
             db: Optional MongoDB database connection for GridFS storage
         """
         if model_manager is None:
-            self.model_manager = ModelManager(models_dir=models_dir, db=db, use_gridfs=True)
+            self.model_manager = ModelManager(
+                models_dir=models_dir, db=db, use_gridfs=True
+            )
         else:
             self.model_manager = model_manager
         self.model: Optional[TransactionCategorizer] = None
@@ -60,7 +61,9 @@ class CategorizationService:
             self.model_loaded = True
             return True
         except FileNotFoundError as e:
-            print(f"Model file not found: {e}. Train a model first using /train-model endpoint.")
+            print(
+                f"Model file not found: {e}. Train a model first using /train-model endpoint."
+            )
             self.model_loaded = False
             return False
         except Exception as e:
@@ -157,7 +160,9 @@ class CategorizationService:
         if "label" not in df.columns and labels:
             df["label"] = labels
         elif "label" not in df.columns:
-            raise ValueError("Training data must include 'label' field or provide labels list")
+            raise ValueError(
+                "Training data must include 'label' field or provide labels list"
+            )
 
         # Initialize and train model
         self.model = TransactionCategorizer()
@@ -214,12 +219,12 @@ class CategorizationService:
             True if loaded successfully, False otherwise
         """
         user_model_name = f"transaction_categorizer_user_{user_id}"
-        
+
         try:
             # Try to load user-specific model
             if TransactionCategorizer is None:
                 raise ImportError("TransactionCategorizer not available")
-            
+
             self.model = self.model_manager.load_model(
                 user_model_name, version=version, use_joblib=True
             )
@@ -261,7 +266,9 @@ class CategorizationService:
         if "label" not in df.columns and labels:
             df["label"] = labels
         elif "label" not in df.columns:
-            raise ValueError("Training data must include 'label' field or provide labels list")
+            raise ValueError(
+                "Training data must include 'label' field or provide labels list"
+            )
 
         # Initialize and train model
         self.model = TransactionCategorizer()
@@ -301,4 +308,3 @@ class CategorizationService:
             return self.model_manager.get_model_info(self.model_name)
         except Exception as e:
             return {"error": str(e), "loaded": self.model_loaded}
-
