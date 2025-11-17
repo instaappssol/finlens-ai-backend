@@ -1,26 +1,21 @@
 import hashlib
 from datetime import datetime
 from typing import Optional
-from pymongo.database import Database
-from pymongo.errors import DuplicateKeyError
-from bson import ObjectId
+
+from app.repositories.user_repository import UserRepository
 
 
 class AuthService:
-    """Service for authentication operations with MongoDB"""
+    """Service for authentication operations following clean architecture"""
 
-    def __init__(self, db: Database):
-        self.db = db
-        self.users_collection = db['users']
-        self._create_indexes()
+    def __init__(self, user_repository: UserRepository):
+        """
+        Initialize authentication service.
 
-    def _create_indexes(self):
-        """Create indexes for better query performance"""
-        try:
-            self.users_collection.create_index('email', unique=True)
-            self.users_collection.create_index('mobile_number', unique=True)
-        except Exception as e:
-            print(f"Index creation warning: {e}")
+        Args:
+            user_repository: Repository for user data access
+        """
+        self.user_repository = user_repository
 
     @staticmethod
     def hash_password(password: str) -> str:
@@ -48,12 +43,12 @@ class AuthService:
             ValueError: If email or mobile number already exists
         """
         # Check if email already exists
-        existing_email = self.users_collection.find_one({'email': email.lower()})
+        existing_email = self.user_repository.find_by_email(email.lower())
         if existing_email:
             raise ValueError(f"Email '{email}' is already registered")
 
         # Check if mobile number already exists
-        existing_mobile = self.users_collection.find_one({'mobile_number': mobile_number})
+        existing_mobile = self.user_repository.find_by_mobile(mobile_number)
         if existing_mobile:
             raise ValueError(f"Mobile number '{mobile_number}' is already registered")
 
@@ -71,10 +66,9 @@ class AuthService:
         }
 
         try:
-            result = self.users_collection.insert_one(user_doc)
-            user_doc['_id'] = result.inserted_id
-            return user_doc
-        except DuplicateKeyError as e:
+            return self.user_repository.create(user_doc)
+        except ValueError as e:
+            # Repository may raise ValueError for duplicates
             raise ValueError(f"User with this email or mobile number already exists: {str(e)}")
 
     def login(self, credential: str, password: str) -> dict:
@@ -92,12 +86,7 @@ class AuthService:
             ValueError: If user not found or password is incorrect
         """
         # Find user by email or mobile number
-        user = self.users_collection.find_one({
-            '$or': [
-                {'email': credential.lower()},
-                {'mobile_number': credential}
-            ]
-        })
+        user = self.user_repository.find_by_credential(credential)
 
         if not user:
             raise ValueError("Invalid email/mobile number or password")
@@ -114,30 +103,21 @@ class AuthService:
 
     def get_user_by_email(self, email: str) -> Optional[dict]:
         """Get user by email"""
-        return self.users_collection.find_one({'email': email.lower()})
+        return self.user_repository.find_by_email(email)
 
     def get_user_by_mobile(self, mobile_number: str) -> Optional[dict]:
         """Get user by mobile number"""
-        return self.users_collection.find_one({'mobile_number': mobile_number})
+        return self.user_repository.find_by_mobile(mobile_number)
 
     def get_user_by_id(self, user_id: str) -> Optional[dict]:
         """Get user by ID"""
-        try:
-            return self.users_collection.find_one({'_id': ObjectId(user_id)})
-        except Exception:
-            return None
+        return self.user_repository.find_by_id(user_id)
 
-    def update_user(self, user_id: str, update_data: dict) -> dict:
+    def update_user(self, user_id: str, update_data: dict) -> Optional[dict]:
         """Update user data"""
         update_data['updated_at'] = datetime.utcnow()
-        result = self.users_collection.find_one_and_update(
-            {'_id': ObjectId(user_id)},
-            {'$set': update_data},
-            return_document=True
-        )
-        return result
+        return self.user_repository.update(user_id, update_data)
 
     def delete_user(self, user_id: str) -> bool:
         """Delete user account"""
-        result = self.users_collection.delete_one({'_id': ObjectId(user_id)})
-        return result.deleted_count > 0
+        return self.user_repository.delete(user_id)

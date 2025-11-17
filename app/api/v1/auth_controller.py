@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Depends, status
 from app.schemas.auth_schema import (
     SignupRequest,
     SignupResponse,
@@ -6,7 +6,7 @@ from app.schemas.auth_schema import (
     LoginResponse,
 )
 from app.services.auth_service import AuthService
-from app.core.db import get_db_from_request
+from app.core.dependencies import get_auth_service
 from app.core.jwt_handler import create_access_token
 from app.core.exceptions import (
     BadRequestException,
@@ -24,12 +24,16 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     summary="User Signup",
     description="Register a new user with email, mobile number, and password",
 )
-def signup(request: Request, signup_data: SignupRequest):
+def signup(
+    signup_data: SignupRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
     """
     Register a new user.
 
     Args:
         signup_data: SignupRequest containing email, mobile_number, and password
+        auth_service: Injected authentication service
 
     Returns:
         SignupResponse: Created user information
@@ -38,9 +42,6 @@ def signup(request: Request, signup_data: SignupRequest):
         HTTPException 400: If email or mobile number already exists
     """
     try:
-        db = get_db_from_request(request)
-        auth_service = AuthService(db)
-
         user = auth_service.signup(
             email=signup_data.email,
             mobile_number=signup_data.mobile_number,
@@ -72,12 +73,16 @@ def signup(request: Request, signup_data: SignupRequest):
     summary="User Login",
     description="Authenticate user with email/mobile number and password",
 )
-def login(request: Request, login_data: LoginRequest):
+def login(
+    login_data: LoginRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
     """
     Authenticate user by email or mobile number.
 
     Args:
         login_data: LoginRequest containing credential (email or mobile) and password
+        auth_service: Injected authentication service
 
     Returns:
         LoginResponse: User information if authentication successful
@@ -86,9 +91,6 @@ def login(request: Request, login_data: LoginRequest):
         HTTPException 401: If credentials are invalid
     """
     try:
-        db = get_db_from_request(request)
-        auth_service = AuthService(db)
-
         user = auth_service.login(
             credential=login_data.credential, password=login_data.password
         )

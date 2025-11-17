@@ -3,10 +3,9 @@ import io
 from collections import Counter
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional, Any
-from pymongo.database import Database
 from bson import ObjectId
 
-from app.models.transaction_model import Transaction
+from app.repositories.transaction_repository import TransactionRepository
 
 
 def serialize_for_json(obj: Any) -> Any:
@@ -27,11 +26,21 @@ def serialize_for_json(obj: Any) -> Any:
 
 
 class TransactionService:
-    """Service for transaction operations with MongoDB"""
+    """Service for transaction operations following clean architecture"""
 
-    def __init__(self, db: Database, categorization_service=None):
-        self.db = db
-        self.transactions_collection = db["transactions"]
+    def __init__(
+        self,
+        transaction_repository: TransactionRepository,
+        categorization_service=None
+    ):
+        """
+        Initialize transaction service.
+
+        Args:
+            transaction_repository: Repository for transaction data access
+            categorization_service: Optional service for transaction categorization
+        """
+        self.transaction_repository = transaction_repository
         self.categorization_service = categorization_service
 
     def parse_csv_and_insert(
@@ -114,9 +123,9 @@ class TransactionService:
             if not rows:
                 return 0, [], {}
 
-            # Insert into MongoDB
-            result = self.transactions_collection.insert_many(rows)
-            inserted_count = len(result.inserted_ids)
+            # Insert into database via repository
+            inserted_ids = self.transaction_repository.insert_many(rows)
+            inserted_count = len(inserted_ids)
 
             # Return sample and stats (serialize datetime objects)
             sample = rows[:3]
@@ -145,21 +154,15 @@ class TransactionService:
 
         Args:
             user_id: If provided, get only this user's transactions
-            min_samples: Minimum samples required per category
+            min_samples: Minimum samples required per category (not used in query, kept for compatibility)
 
         Returns:
             List of labeled transactions
         """
-        query = {
-            "category": {"$exists": True, "$ne": None, "$ne": ""},
-            "category_source": {"$ne": "auto_ml"}  # Only user-labeled or manual
-        }
-        
-        if user_id:
-            query["user_id"] = user_id
-
-        transactions = list(self.transactions_collection.find(query))
-        return transactions
+        return self.transaction_repository.find_labeled_transactions(
+            user_id=user_id,
+            exclude_auto_categorized=True
+        )
 
     def parse_csv_for_training(self, file_content: bytes) -> Tuple[List[Dict], List[str]]:
         """
@@ -245,29 +248,4 @@ class TransactionService:
 
     def get_training_data_stats(self, user_id: Optional[str] = None) -> Dict:
         """Get statistics about available training data"""
-        labeled = self.get_labeled_transactions(user_id)
-        
-        if not labeled:
-            return {
-                "total_labeled": 0,
-                "categories": {},
-                "can_train_global": False,
-                "can_train_user": False
-            }
-
-        # Count by category
-        category_counts = {}
-        for txn in labeled:
-            cat = txn.get("category", "Unknown")
-            category_counts[cat] = category_counts.get(cat, 0) + 1
-
-        total = len(labeled)
-        min_samples_per_category = min(category_counts.values()) if category_counts else 0
-
-        return {
-            "total_labeled": total,
-            "categories": category_counts,
-            "min_samples_per_category": min_samples_per_category,
-            "can_train_global": total >= 50 and min_samples_per_category >= 2,
-            "can_train_user": user_id and total >= 20 and min_samples_per_category >= 2
-        }
+        return self.transaction_repository.get_training_data_stats(user_id=user_id)
