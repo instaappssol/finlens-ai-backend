@@ -1,7 +1,8 @@
 """MongoDB implementation of TransactionRepository"""
 
 from typing import List, Dict, Optional, Any
-from collections import Counter
+from collections import defaultdict
+from datetime import datetime
 from pymongo.database import Database
 from bson import ObjectId
 
@@ -78,5 +79,179 @@ class MongoTransactionRepository(TransactionRepository):
             "min_samples_per_category": min_samples_per_category,
             "can_train_global": total >= 50 and min_samples_per_category >= 2,
             "can_train_user": user_id is not None and total >= 20 and min_samples_per_category >= 2,
+        }
+
+    def _parse_date(self, date_value: Any) -> Optional[datetime]:
+        """Parse date from various formats"""
+        if date_value is None:
+            return None
+        
+        if isinstance(date_value, datetime):
+            return date_value
+        
+        if isinstance(date_value, str):
+            try:
+                # Try ISO format first
+                if 'T' in date_value:
+                    return datetime.fromisoformat(date_value.replace('Z', '+00:00'))
+                else:
+                    # Try YYYY-MM-DD format
+                    return datetime.strptime(date_value, "%Y-%m-%d")
+            except (ValueError, AttributeError):
+                return None
+        
+        return None
+
+    def _is_in_month_year(self, date_value: Any, year: int, month: int) -> bool:
+        """Check if date falls in the specified month and year"""
+        parsed_date = self._parse_date(date_value)
+        if parsed_date is None:
+            return False
+        return parsed_date.year == year and parsed_date.month == month
+
+    def _is_inflow(self, transaction: Dict[str, Any]) -> bool:
+        """
+        Determine if transaction is an inflow (CREDIT) or outflow (DEBIT).
+        
+        Uses transaction_type field which has values: DEBIT or CREDIT
+        
+        Note: CREDIT = money coming in (inflow/income)
+              DEBIT = money going out (outflow/expense)
+        """
+        # Check transaction_type field for DEBIT/CREDIT values
+        transaction_type = transaction.get("transaction_type", "")
+        if transaction_type:
+            transaction_type_upper = str(transaction_type).upper()
+            if transaction_type_upper == "CREDIT":
+                return True  # CREDIT = inflow (money coming in)
+            if transaction_type_upper == "DEBIT":
+                return False  # DEBIT = outflow (expense)
+        
+        # Fallback: If transaction_type is not DEBIT/CREDIT, default to DEBIT (expense)
+        return False
+
+    def get_transactions_by_month_year(
+        self,
+        year: int,
+        month: int,
+        user_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all transactions for a specific month and year"""
+        query = {}
+        
+        if user_id:
+            query["user_id"] = user_id
+
+        # Get all transactions (we'll filter by date in Python since date formats may vary)
+        all_transactions = list(self.collection.find(query))
+        
+        # Filter by month and year
+        filtered = []
+        for txn in all_transactions:
+            date_value = txn.get("date") or txn.get("timestamp") or txn.get("created_at")
+            if self._is_in_month_year(date_value, year, month):
+                filtered.append(txn)
+        
+        return filtered
+
+    def get_transactions_by_category(
+        self,
+        year: int,
+        month: int,
+        category: str,
+        user_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all transactions for a specific category in a month and year"""
+        query = {"category": category}
+        
+        if user_id:
+            query["user_id"] = user_id
+
+        # Get all transactions with this category
+        all_transactions = list(self.collection.find(query))
+        
+        # Filter by month and year
+        filtered = []
+        for txn in all_transactions:
+            date_value = txn.get("date") or txn.get("timestamp") or txn.get("created_at")
+            if self._is_in_month_year(date_value, year, month):
+                filtered.append(txn)
+        
+        return filtered
+
+    def get_analytics_summary(
+        self,
+        year: int,
+        month: int,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get analytics summary (inflows, outflows, category breakdowns) for a month"""
+        transactions = self.get_transactions_by_month_year(year, month, user_id)
+        
+        total_inflows = 0.0
+        total_outflows = 0.0
+        inflows_by_category = defaultdict(lambda: {"amount": 0.0, "count": 0})
+        outflows_by_category = defaultdict(lambda: {"amount": 0.0, "count": 0})
+        
+        for txn in transactions:
+            amount = txn.get("amount", 0)
+            try:
+                amount_float = float(amount)
+            except (ValueError, TypeError):
+                continue
+            
+            category = txn.get("category", "Uncategorized")
+            is_inflow = self._is_inflow(txn)
+            
+            # Use absolute value for calculations
+            abs_amount = abs(amount_float)
+            
+            if is_inflow:
+                total_inflows += abs_amount
+                inflows_by_category[category]["amount"] += abs_amount
+                inflows_by_category[category]["count"] += 1
+            else:
+                total_outflows += abs_amount
+                outflows_by_category[category]["amount"] += abs_amount
+                outflows_by_category[category]["count"] += 1
+        
+        # Calculate difference percentage
+        total = total_inflows + total_outflows
+        if total > 0:
+            diff_percentage = ((total_inflows - total_outflows) / total) * 100
+        else:
+            diff_percentage = 0.0
+        
+        # Convert category dicts to lists with percentage calculations
+        inflows_list = []
+        for cat, data in inflows_by_category.items():
+            percentage = (data["amount"] / total_inflows * 100) if total_inflows > 0 else 0.0
+            inflows_list.append({
+                "category": cat,
+                "amount": round(data["amount"], 2),
+                "count": data["count"],
+                "percentage": round(percentage, 2)
+            })
+        
+        outflows_list = []
+        for cat, data in outflows_by_category.items():
+            percentage = (data["amount"] / total_outflows * 100) if total_outflows > 0 else 0.0
+            outflows_list.append({
+                "category": cat,
+                "amount": round(data["amount"], 2),
+                "count": data["count"],
+                "percentage": round(percentage, 2)
+            })
+        
+        # Sort by amount descending
+        inflows_list.sort(key=lambda x: x["amount"], reverse=True)
+        outflows_list.sort(key=lambda x: x["amount"], reverse=True)
+        
+        return {
+            "total_inflows": round(total_inflows, 2),
+            "total_outflows": round(total_outflows, 2),
+            "diff_percentage": round(diff_percentage, 2),
+            "inflows_by_category": inflows_list,
+            "outflows_by_category": outflows_list,
         }
 

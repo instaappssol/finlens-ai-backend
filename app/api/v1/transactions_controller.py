@@ -19,6 +19,9 @@ from app.schemas.transaction_schema import (
     UploadTransactionsResponse,
     CategorizationStats,
     TrainingDataStats,
+    AnalyticsSummaryResponse,
+    CategoryTransactionsResponse,
+    CategoryBreakdown,
 )
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -318,4 +321,99 @@ async def get_model_info(
     except Exception as e:
         raise InternalServerErrorException(
             message="Failed to get model info", errors=[str(e)]
+        )
+
+
+@router.get(
+    "/analytics",
+    status_code=status.HTTP_200_OK,
+    summary="Get transaction analytics summary",
+    description="Get analytics summary (inflows, outflows, category breakdowns) for a specific month and year.",
+)
+async def get_analytics_summary(
+    request: Request,
+    year: int = Query(..., description="Year (e.g., 2024)", ge=2000, le=2100),
+    month: int = Query(..., description="Month (1-12)", ge=1, le=12),
+    service: TransactionService = Depends(get_transaction_service)
+):
+    """Get analytics summary for a specific month and year"""
+    try:
+        # Get user_id from JWT token (set by middleware)
+        user_id = None
+        if hasattr(request.state, 'user'):
+            user_id = request.state.user.get('user_id') or request.state.user.get('sub')
+
+        # Get analytics summary
+        analytics_data = service.get_analytics_summary(year, month, user_id)
+
+        # Convert category breakdowns to proper format
+        inflows_by_category = [
+            CategoryBreakdown(**item) for item in analytics_data["inflows_by_category"]
+        ]
+        outflows_by_category = [
+            CategoryBreakdown(**item) for item in analytics_data["outflows_by_category"]
+        ]
+
+        response_data = AnalyticsSummaryResponse(
+            total_inflows=analytics_data["total_inflows"],
+            total_outflows=analytics_data["total_outflows"],
+            diff_percentage=analytics_data["diff_percentage"],
+            inflows_by_category=inflows_by_category,
+            outflows_by_category=outflows_by_category,
+        )
+
+        resp = ResponseBody(
+            message="Analytics summary retrieved successfully",
+            errors=[],
+            data=response_data.model_dump(),
+        )
+        return JSONResponse(status_code=status.HTTP_200_OK, content=resp.model_dump())
+
+    except Exception as e:
+        raise InternalServerErrorException(
+            message="Failed to get analytics summary", errors=[str(e)]
+        )
+
+
+@router.get(
+    "/category-transactions",
+    status_code=status.HTTP_200_OK,
+    summary="Get transactions by category",
+    description="Get all transactions for a specific category in a given month and year.",
+)
+async def get_category_transactions(
+    request: Request,
+    year: int = Query(..., description="Year (e.g., 2024)", ge=2000, le=2100),
+    month: int = Query(..., description="Month (1-12)", ge=1, le=12),
+    category: str = Query(..., description="Category name"),
+    service: TransactionService = Depends(get_transaction_service)
+):
+    """Get all transactions for a specific category in a month and year"""
+    try:
+        # Get user_id from JWT token (set by middleware)
+        user_id = None
+        if hasattr(request.state, 'user'):
+            user_id = request.state.user.get('user_id') or request.state.user.get('sub')
+
+        # Get transactions by category
+        transactions = service.get_transactions_by_category(year, month, category, user_id)
+
+        response_data = CategoryTransactionsResponse(
+            transactions=transactions,
+            count=len(transactions),
+            category=category,
+            year=year,
+            month=month,
+        )
+
+        resp = ResponseBody(
+            message="Category transactions retrieved successfully",
+            errors=[],
+            data=response_data.model_dump(),
+        )
+        return JSONResponse(status_code=status.HTTP_200_OK, content=resp.model_dump())
+
+    except Exception as e:
+        raise InternalServerErrorException(
+            message="Failed to get category transactions", errors=[str(e)]
         )

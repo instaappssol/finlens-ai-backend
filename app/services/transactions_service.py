@@ -77,6 +77,14 @@ class TransactionService:
                 row["created_at"] = datetime.now()
                 row["updated_at"] = datetime.now()
 
+                # Ensure transaction_type is set to DEBIT or CREDIT if not provided
+                # Default to DEBIT (expense) if not specified
+                if not row.get("transaction_type") or row.get("transaction_type").upper() not in ["DEBIT", "CREDIT"]:
+                    # If transaction_type exists but is not DEBIT/CREDIT, keep it as is
+                    # Otherwise default to DEBIT
+                    if not row.get("transaction_type"):
+                        row["transaction_type"] = "DEBIT"
+
                 # Check if category already exists
                 has_category = row.get("category") and row.get("category").strip()
 
@@ -96,16 +104,27 @@ class TransactionService:
                         except (ValueError, TypeError):
                             amount = 0.0
 
-                        prediction = self.categorization_service.predict({
+                        transaction_data = {
                             "description": row.get("description", ""),
                             "amount": amount,
                             "transaction_type": row.get("transaction_type"),
                             "currency": row.get("currency", "INR"),
                             "timestamp": row.get("date") or row.get("timestamp", ""),
-                        })
+                        }
+                        
+                        # Get prediction
+                        prediction = self.categorization_service.predict(transaction_data)
                         row["category"] = prediction["category"]
-                        row["category_confidence"] = prediction["confidence_score"]
-                        row["category_source"] = "auto_ml"
+                        
+                        # Get XAI explanation
+                        try:
+                            explanation = self.categorization_service.explain_prediction(transaction_data)
+                            row["explanation"] = explanation
+                        except Exception as explain_error:
+                            # Log but don't fail if explanation fails
+                            print(f"Failed to get explanation for transaction '{row.get('description', 'unknown')}': {str(explain_error)}")
+                            row["explanation"] = None
+                        
                         categorized_count += 1
                     except Exception as e:
                         # Log error but don't fail the upload
@@ -249,3 +268,47 @@ class TransactionService:
     def get_training_data_stats(self, user_id: Optional[str] = None) -> Dict:
         """Get statistics about available training data"""
         return self.transaction_repository.get_training_data_stats(user_id=user_id)
+
+    def get_analytics_summary(
+        self,
+        year: int,
+        month: int,
+        user_id: Optional[str] = None
+    ) -> Dict:
+        """
+        Get analytics summary for a specific month and year.
+
+        Args:
+            year: Year (e.g., 2024)
+            month: Month (1-12)
+            user_id: Optional user ID to filter by
+
+        Returns:
+            Dictionary with analytics data
+        """
+        return self.transaction_repository.get_analytics_summary(year, month, user_id)
+
+    def get_transactions_by_category(
+        self,
+        year: int,
+        month: int,
+        category: str,
+        user_id: Optional[str] = None
+    ) -> List[Dict]:
+        """
+        Get all transactions for a specific category in a month and year.
+
+        Args:
+            year: Year (e.g., 2024)
+            month: Month (1-12)
+            category: Category name
+            user_id: Optional user ID to filter by
+
+        Returns:
+            List of transactions
+        """
+        transactions = self.transaction_repository.get_transactions_by_category(
+            year, month, category, user_id
+        )
+        # Serialize for JSON response
+        return [serialize_for_json(txn) for txn in transactions]

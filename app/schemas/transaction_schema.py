@@ -163,3 +163,38 @@ class UploadTransactionsResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class CategoryBreakdown(BaseModel):
+    """Schema for category breakdown in analytics"""
+    category: str = Field(..., description="Category name")
+    amount: float = Field(..., description="Total amount for this category")
+    count: int = Field(..., description="Number of transactions in this category")
+    percentage: float = Field(..., description="Percentage of total inflows/outflows this category represents")
+
+    class Config:
+        from_attributes = True
+
+
+class AnalyticsSummaryResponse(BaseModel):
+    """Schema for analytics summary response"""
+    total_inflows: float = Field(..., description="Total inflow amount")
+    total_outflows: float = Field(..., description="Total outflow amount")
+    diff_percentage: float = Field(..., description="Difference percentage (positive = more inflows, negative = more outflows)")
+    inflows_by_category: List[CategoryBreakdown] = Field(..., description="Inflows aggregated by category")
+    outflows_by_category: List[CategoryBreakdown] = Field(..., description="Outflows aggregated by category")
+
+    class Config:
+        from_attributes = True
+
+
+class CategoryTransactionsResponse(BaseModel):
+    """Schema for category transactions response"""
+    transactions: List[Dict[str, Any]] = Field(..., description="List of transactions")
+    count: int = Field(..., description="Number of transactions")
+    category: str = Field(..., description="Category name")
+    year: int = Field(..., description="Year")
+    month: int = Field(..., description="Month")
+
+    class Config:
+        from_attributes = True
+
