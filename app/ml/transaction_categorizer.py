@@ -120,7 +120,7 @@ class FeatureBuilder:
     def __init__(self):
         self.ct: Optional[ColumnTransformer] = None
         self.text_col = "clean_description"
-        self.categorical_cols = ["transaction_type", "currency"]
+        self.categorical_cols = ["transaction_type"]
         self.numeric_cols = ["amount", "hour", "is_p2p"]
 
     def build_transformer(self, df: pd.DataFrame) -> ColumnTransformer:
@@ -174,7 +174,8 @@ class PredictionResult:
     confidence_score: float
     model_version: str = "v0.1.0"
     explanation_id: Optional[str] = None
-
+    error: Optional[str] = None
+    
     def to_json(self) -> str:
         return json.dumps(asdict(self))
 
@@ -198,9 +199,8 @@ class TransactionCategorizer:
 
         proc_df = pd.DataFrame(processed_rows)
 
-        for col in ["transaction_type", "currency"]:
-            if col not in proc_df.columns:
-                proc_df[col] = "unknown"
+        if "transaction_type" not in proc_df.columns:
+            proc_df["transaction_type"] = "unknown"
 
         X = proc_df
         y = df["label"].astype(str)
@@ -233,9 +233,8 @@ class TransactionCategorizer:
 
         enriched = self.pre.enrich(txn)
         df = pd.DataFrame([enriched])
-        for col in ["transaction_type", "currency"]:
-            if col not in df.columns:
-                df[col] = "unknown"
+        if "transaction_type" not in df.columns:
+            df["transaction_type"] = "unknown"
 
         X_vec = self.fb.transform(df)
         proba = self.model.predict_proba(X_vec)[0]
@@ -270,74 +269,134 @@ class TransactionCategorizer:
         obj.fitted = payload["fitted"]
         return obj
 
-    def explain_one(self, txn: Dict[str, Any]) -> Dict[str, Any]:
+    def explain_one(self, txn: Dict[str, Any], top_n: int = 5) -> Dict[str, Any]:
+        """
+        Generate dynamic explanation for a transaction prediction.
+        
+        Args:
+            txn: Transaction dictionary
+            top_n: Number of top contributing features to return
+            
+        Returns:
+            Dictionary with prediction and top contributing features
+        """
+        if not self.fitted:
+            raise RuntimeError("Model not fitted. Train or load weights first.")
+        
         pred = self.predict_one(txn)
-        return {
-            "transaction_id": pred.transaction_id,
-            "predicted_category": pred.category,
-            "confidence_score": pred.confidence_score,
-            "top_factors": [
-                {"feature": "clean_description", "contribution": 0.6},
-                {"feature": "amount", "contribution": 0.1},
-            ],
-            "model_version": pred.model_version,
-        }
-
-
-if __name__ == "__main__":
-    data = [
-        {
-            "transaction_id": "txn_1",
-            "description": "AMAZON PAYMENTS INDIA",
-            "amount": 899.0,
-            "transaction_type": "CARD",
-            "currency": "INR",
-            "timestamp": "2025-11-07T13:00:00Z",
-            "label": "Shopping",
-        },
-        {
-            "transaction_id": "txn_2",
-            "description": "STARBUCKS COFFEE",
-            "amount": 230.0,
-            "transaction_type": "CARD",
-            "currency": "INR",
-            "timestamp": "2025-11-07T09:00:00Z",
-            "label": "Food & Beverage",
-        },
-        {
-            "transaction_id": "txn_3",
-            "description": "IMPS/PAYMENT TO SHEKHAR",
-            "amount": 1500.0,
-            "transaction_type": "P2P_TRANSFER",
-            "currency": "INR",
-            "timestamp": "2025-11-07T12:00:00Z",
-            "label": "Transfers",
-        },
-        {
-            "transaction_id": "txn_4",
-            "description": "HPCL FUEL PUMP",
-            "amount": 1900.0,
-            "transaction_type": "CARD",
-            "currency": "INR",
-            "timestamp": "2025-11-07T08:00:00Z",
-            "label": "Fuel",
-        },
-    ]
-
-    df = pd.DataFrame(data)
-    model = TransactionCategorizer()
-    model.fit_from_dataframe(df)
-
-    new_txn = {
-        "transaction_id": "txn_999",
-        "description": "IMPS/Payment to Rakesh",
-        "amount": 1200,
-        "transaction_type": "P2P_TRANSFER",
-        "currency": "INR",
-        "timestamp": "2025-11-07T10:30:00Z",
-    }
-    pred = model.predict_one(new_txn)
-    print("Prediction:", pred.to_json())
-
-    exp = model.explain_one(new_txn)
-    print("Explanation:", json.dumps(exp, indent=2))
+        
+        try:
+            # Get the transformed feature vector
+            enriched = self.pre.enrich(txn)
+            df = pd.DataFrame([enriched])
+            if "transaction_type" not in df.columns:
+                df["transaction_type"] = "unknown"
+            
+            X_vec = self.fb.transform(df)
+            
+            # Get feature names
+            feature_names = self.fb.get_feature_names()
+            
+            if not feature_names:
+                # Fallback if feature names are not available
+                return {
+                    "transaction_id": pred.transaction_id,
+                    "predicted_category": pred.category,
+                    "confidence_score": pred.confidence_score,
+                    "top_factors": [],
+                    "model_version": pred.model_version,
+                    "error": "No feature names available",
+                }
+            
+            # Get coefficients for the predicted class
+            class_matches = np.where(self.model.classes_ == pred.category)[0]
+            if len(class_matches) == 0:
+                # Fallback if category not found in classes
+                return {
+                    "transaction_id": pred.transaction_id,
+                    "predicted_category": pred.category,
+                    "confidence_score": pred.confidence_score,
+                    "top_factors": [],
+                    "model_version": pred.model_version,
+                    "error": "Category not found in classes",
+                }
+            
+            class_idx = class_matches[0]
+            
+            # Handle binary classification case where coef_ has shape (1, n_features)
+            # For binary: coef_[0] represents class1 vs class0
+            # For multiclass: coef_[class_idx] represents the class
+            if len(self.model.classes_) == 2 and self.model.coef_.shape[0] == 1:
+                # Binary classification: use coef_[0] for class1, negate for class0
+                if class_idx == 1:
+                    coefficients = self.model.coef_[0]
+                else:  # class_idx == 0
+                    coefficients = -self.model.coef_[0]
+            else:
+                # Multiclass or other cases: use coef_[class_idx]
+                if class_idx >= self.model.coef_.shape[0]:
+                    # Index out of bounds - fallback
+                    return {
+                        "transaction_id": pred.transaction_id,
+                        "predicted_category": pred.category,
+                        "confidence_score": pred.confidence_score,
+                        "top_factors": [],
+                        "model_version": pred.model_version,
+                        "error": f"Class index {class_idx} out of bounds for coef_ shape {self.model.coef_.shape}",
+                    }
+                coefficients = self.model.coef_[class_idx]
+            
+            # Calculate feature contributions (feature_value * coefficient)
+            if hasattr(X_vec, 'toarray'):
+                feature_values = X_vec.toarray()[0]
+            else:
+                feature_values = np.asarray(X_vec[0]).flatten()
+            
+            # Ensure feature_values and coefficients have matching lengths
+            min_len = min(len(feature_values), len(coefficients), len(feature_names))
+            if min_len == 0:
+                return {
+                    "transaction_id": pred.transaction_id,
+                    "predicted_category": pred.category,
+                    "confidence_score": pred.confidence_score,
+                    "top_factors": [],
+                    "model_version": pred.model_version,
+                    "error": "No feature names available",
+                }
+            
+            # Truncate to minimum length to ensure alignment
+            feature_values = feature_values[:min_len]
+            coefficients = coefficients[:min_len]
+            feature_names = feature_names[:min_len]
+            
+            contributions = feature_values * coefficients
+            
+            # Create list of (feature_name, contribution) tuples
+            feature_contributions = list(zip(feature_names, contributions))
+            
+            # Sort by absolute contribution and get top N
+            feature_contributions.sort(key=lambda x: abs(x[1]), reverse=True)
+            top_factors = [
+                {"feature": name, "contribution": float(contrib)}
+                for name, contrib in feature_contributions[:top_n]
+            ]
+            
+            return {
+                "transaction_id": pred.transaction_id,
+                "predicted_category": pred.category,
+                "confidence_score": pred.confidence_score,
+                "top_factors": top_factors,
+                "model_version": pred.model_version,
+                "error": None,
+            }
+        except Exception as e:
+            # Return a minimal explanation if feature extraction fails
+            # This prevents the entire explanation from being null
+            return {
+                "transaction_id": pred.transaction_id,
+                "predicted_category": pred.category,
+                "confidence_score": pred.confidence_score,
+                "top_factors": [],
+                "model_version": pred.model_version,
+                "error": f"Could not generate detailed explanation: {str(e)}",
+            }

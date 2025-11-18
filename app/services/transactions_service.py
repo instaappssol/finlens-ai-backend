@@ -122,8 +122,17 @@ class TransactionService:
                             row["explanation"] = explanation
                         except Exception as explain_error:
                             # Log but don't fail if explanation fails
-                            print(f"Failed to get explanation for transaction '{row.get('description', 'unknown')}': {str(explain_error)}")
-                            row["explanation"] = None
+                            # Still save error information in explanation
+                            error_msg = str(explain_error)
+                            print(f"Failed to get explanation for transaction '{row.get('description', 'unknown')}': {error_msg}")
+                            row["explanation"] = {
+                                "transaction_id": row.get("transaction_id"),
+                                "predicted_category": row.get("category"),
+                                "confidence_score": 0.0,
+                                "top_factors": [],
+                                "model_version": "unknown",
+                                "error": f"Exception during explanation: {error_msg}",
+                            }
                         
                         categorized_count += 1
                     except Exception as e:
