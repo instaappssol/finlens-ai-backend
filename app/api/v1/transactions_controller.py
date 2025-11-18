@@ -6,7 +6,7 @@ from app.core.dependencies import (
     get_transaction_service,
     get_categorization_service
 )
-from app.core.exceptions import InternalServerErrorException, ResponseBody
+from app.core.exceptions import InternalServerErrorException, BadRequestException, ResponseBody
 from app.services.transactions_service import TransactionService
 from app.services.categorization_service import CategorizationService
 from app.schemas.transaction_schema import (
@@ -338,12 +338,18 @@ async def get_analytics_summary(
 ):
     """Get analytics summary for a specific month and year"""
     try:
-        # Get user_id from JWT token (set by middleware)
+        # Get user_id from JWT token (set by middleware) - REQUIRED
         user_id = None
         if hasattr(request.state, 'user'):
             user_id = request.state.user.get('user_id') or request.state.user.get('sub')
+        
+        if not user_id:
+            raise BadRequestException(
+                message="User authentication required",
+                errors=["User ID not found in token"]
+            )
 
-        # Get analytics summary
+        # Get analytics summary (only for this user)
         analytics_data = service.get_analytics_summary(year, month, user_id)
 
         # Convert category breakdowns to proper format
@@ -390,12 +396,18 @@ async def get_category_transactions(
 ):
     """Get all transactions for a specific category in a month and year"""
     try:
-        # Get user_id from JWT token (set by middleware)
+        # Get user_id from JWT token (set by middleware) - REQUIRED
         user_id = None
         if hasattr(request.state, 'user'):
             user_id = request.state.user.get('user_id') or request.state.user.get('sub')
+        
+        if not user_id:
+            raise BadRequestException(
+                message="User authentication required",
+                errors=["User ID not found in token"]
+            )
 
-        # Get transactions by category
+        # Get transactions by category (only for this user)
         transactions = service.get_transactions_by_category(year, month, category, user_id)
 
         response_data = CategoryTransactionsResponse(
