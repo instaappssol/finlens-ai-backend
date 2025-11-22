@@ -80,7 +80,8 @@ class TransactionRepository(ABC):
         year: int,
         month: int,
         category: str,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        transaction_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Get all transactions for a specific category in a month and year.
@@ -90,6 +91,7 @@ class TransactionRepository(ABC):
             month: Month (1-12)
             category: Category name
             user_id: Optional user ID to filter by
+            transaction_type: Optional transaction type filter (DEBIT/CREDIT)
 
         Returns:
             List of transactions

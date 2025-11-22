@@ -159,13 +159,20 @@ class MongoTransactionRepository(TransactionRepository):
         year: int,
         month: int,
         category: str,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        transaction_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get all transactions for a specific category in a month and year"""
         query = {"category": category}
         
         if user_id:
             query["user_id"] = user_id
+        
+        if transaction_type:
+            # Normalize transaction_type to uppercase for matching
+            transaction_type_upper = str(transaction_type).upper()
+            if transaction_type_upper in ["DEBIT", "CREDIT"]:
+                query["transaction_type"] = transaction_type_upper
 
         # Get all transactions with this category
         all_transactions = list(self.collection.find(query))

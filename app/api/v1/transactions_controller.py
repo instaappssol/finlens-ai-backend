@@ -18,6 +18,7 @@ from app.schemas.transaction_schema import (
     UniqueCategoriesResponse,
     UpdateCategoryRequest,
     UpdateCategoryResponse,
+    CategoryTransactionsResponse,
 )
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -215,4 +216,60 @@ async def submit_category_feedback(
             message="Failed to store feedback", errors=[str(e)]
         )
 
+@router.get(
+    "/category-transactions",
+    status_code=status.HTTP_200_OK,
+    summary="Get transactions by category",
+    description="Get all transactions for a specific category in a given month and year. Optionally filter by transaction type (DEBIT/CREDIT).",
+)
+async def get_category_transactions(
+    request: Request,
+    year: int = Query(..., description="Year (e.g., 2024)", ge=2000, le=2100),
+    month: int = Query(..., description="Month (1-12)", ge=1, le=12),
+    category: str = Query(..., description="Category name"),
+    transaction_type: Optional[str] = Query(None, description="Transaction type (DEBIT/CREDIT). Optional filter."),
+    service: TransactionService = Depends(get_transaction_service)
+):
+    """Get all transactions for a specific category in a month and year"""
+    try:
+        # Get user_id from JWT token (set by middleware)
+        user_id = None
+        if hasattr(request.state, 'user'):
+            user_id = request.state.user.get('user_id') or request.state.user.get('sub')
+        
+        if not user_id:
+            raise BadRequestException(
+                message="User authentication required",
+                errors=["User ID not found in token"]
+            )
 
+        # Get transactions by category
+        transactions = service.get_transactions_by_category(
+            year=year, 
+            month=month, 
+            category=category, 
+            user_id=user_id,
+            transaction_type=transaction_type
+        )
+
+        response_data = CategoryTransactionsResponse(
+            transactions=transactions,
+            count=len(transactions),
+            category=category,
+            year=year,
+            month=month,
+        )
+
+        resp = ResponseBody(
+            message="Category transactions retrieved successfully",
+            errors=[],
+            data=response_data.model_dump(),
+        )
+        return JSONResponse(status_code=status.HTTP_200_OK, content=resp.model_dump())
+
+    except BadRequestException:
+        raise
+    except Exception as e:
+        raise InternalServerErrorException(
+            message="Failed to get category transactions", errors=[str(e)]
+        )

@@ -327,7 +327,8 @@ class TransactionService:
         year: int,
         month: int,
         category: str,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        transaction_type: Optional[str] = None
     ) -> List[Dict]:
         """
         Get all transactions for a specific category in a month and year.
@@ -337,12 +338,13 @@ class TransactionService:
             month: Month (1-12)
             category: Category name
             user_id: Optional user ID to filter by
+            transaction_type: Optional transaction type filter (DEBIT/CREDIT)
 
         Returns:
             List of transactions
         """
         transactions = self.transaction_repository.get_transactions_by_category(
-            year, month, category, user_id
+            year, month, category, user_id, transaction_type
         )
         # Serialize for JSON response
         return [serialize_for_json(txn) for txn in transactions]
