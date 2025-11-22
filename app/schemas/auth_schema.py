@@ -5,6 +5,7 @@ from app.core.exceptions import UnprocessableEntityException
 
 class SignupRequest(BaseModel):
     """Schema for user signup request"""
+    name: str = Field(..., description="User's full name", min_length=1, max_length=100)
     email: EmailStr = Field(..., description="User's email address")
     mobile_number: str = Field(default="9999999999", description="User's mobile number", min_length=10, max_length=10)
     password: str = Field(..., description="User's password", min_length=6)
@@ -42,6 +43,7 @@ class SignupRequest(BaseModel):
 class SignupResponse(BaseModel):
     """Schema for signup response"""
     id: str = Field(..., description="User ID")
+    name: str = Field(..., description="User's full name")
     email: str = Field(..., description="User's email address")
     message: str = Field(..., description="Success message")
 

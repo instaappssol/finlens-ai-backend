@@ -43,6 +43,7 @@ def signup(
     """
     try:
         user = auth_service.signup(
+            name=signup_data.name,
             email=signup_data.email,
             mobile_number=signup_data.mobile_number,
             password=signup_data.password,
@@ -52,6 +53,7 @@ def signup(
             message="User registered successfully",
             data=SignupResponse(
                 id=str(user["_id"]),
+                name=user.get("name", ""),
                 email=user["email"],
                 message="User registered successfully",
             ),

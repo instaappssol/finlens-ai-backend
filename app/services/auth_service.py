@@ -27,11 +27,12 @@ class AuthService:
         """Verify password against hash"""
         return hashlib.sha256(password.encode()).hexdigest() == password_hash
 
-    def signup(self, email: str, mobile_number: str, password: str) -> dict:
+    def signup(self, name: str, email: str, mobile_number: str, password: str) -> dict:
         """
         Register a new user
         
         Args:
+            name: User's full name
             email: User's email address
             mobile_number: User's mobile number
             password: User's password (will be hashed)
@@ -57,6 +58,7 @@ class AuthService:
 
         # Create user document
         user_doc = {
+            'name': name.strip(),
             'email': email.lower(),
             'mobile_number': mobile_number,
             'password_hash': password_hash,
