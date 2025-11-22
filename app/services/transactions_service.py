@@ -93,33 +93,61 @@ class TransactionService:
                 # Auto-categorize if enabled and model available
                 if auto_categorize and self.categorization_service and not has_category:
                     try:
-                        # Check if model is loaded
-                        if not self.categorization_service.model_loaded:
-                            # Try to load model
-                            if not self.categorization_service.load_model():
-                                raise RuntimeError("Model not available. Please train a model first.")
+                        # First, check for user feedback (corrections)
+                        description = row.get("description", "")
+                        feedback_category = self.transaction_repository.get_user_feedback(
+                            description=description,
+                            user_id=user_id
+                        )
                         
-                        # Get amount, handling string or number
+                        # Get amount, handling string or number (needed for both feedback and model)
                         amount = row.get("amount", 0)
                         try:
                             amount = float(amount)
                         except (ValueError, TypeError):
                             amount = 0.0
 
-                        # Only send description and amount to the model
-                        # The model will use defaults for other fields
+                        # Prepare transaction_data for explanation (needed in both cases)
                         transaction_data = {
-                            "description": row.get("description", ""),
+                            "description": description,
                             "amount": amount,
                         }
+
+                        if feedback_category:
+                            # Use user feedback category
+                            row["category"] = feedback_category
+                            row["category_source"] = "user_feedback"
+                            categorized_count += 1
+                        else:
+                            # No feedback found, use model prediction
+                            # Check if model is loaded
+                            if not self.categorization_service.model_loaded:
+                                # Try to load model
+                                if not self.categorization_service.load_model():
+                                    raise RuntimeError("Model not available. Please train a model first.")
+                            
+                            # Get prediction
+                            prediction = self.categorization_service.predict(transaction_data)
+                            row["category"] = prediction["category"]
                         
-                        # Get prediction
-                        prediction = self.categorization_service.predict(transaction_data)
-                        row["category"] = prediction["category"]
-                        
-                        # Get XAI explanation
+                        # Get XAI explanation (only if model is available)
                         try:
-                            explanation = self.categorization_service.explain_prediction(transaction_data)
+                            if self.categorization_service.model_loaded:
+                                explanation = self.categorization_service.explain_prediction(transaction_data)
+                            else:
+                                # If no model, create a simple explanation
+                                explanation = {
+                                    "transaction_id": row.get("transaction_id"),
+                                    "predicted_category": row.get("category"),
+                                    "confidence_score": 1.0 if feedback_category else 0.0,
+                                    "top_factors": [
+                                        {"feature": "user_feedback", "contribution": 1.0} if feedback_category else {}
+                                    ],
+                                    "model_version": "user_feedback" if feedback_category else "unknown",
+                                    "normalized_merchant": description,
+                                    "kb_category": feedback_category if feedback_category else None,
+                                    "merchant_confidence": 1.0 if feedback_category else 0.0,
+                                }
                             row["explanation"] = explanation
                         except Exception as explain_error:
                             # Log but don't fail if explanation fails
@@ -135,7 +163,7 @@ class TransactionService:
                                 "error": f"Exception during explanation: {error_msg}",
                             }
                         
-                        categorized_count += 1
+                            categorized_count += 1
                     except Exception as e:
                         # Log error but don't fail the upload
                         error_msg = str(e)
@@ -480,4 +508,40 @@ class TransactionService:
             "inserted_count": inserted_count,
             "total_rows_processed": len(df),
             "collection": "merchant_corrections"
+        }
+
+    def store_user_feedback(
+        self,
+        transaction_id: str,
+        category: str,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Store user feedback for future categorizations (does not update transaction).
+
+        Args:
+            transaction_id: Transaction ID to get description from
+            category: Category feedback from user
+            user_id: User ID who provided the feedback
+
+        Returns:
+            Dictionary with feedback result
+        """
+        if not category or not category.strip():
+            raise ValueError("Category cannot be empty")
+
+        success = self.transaction_repository.store_user_feedback(
+            transaction_id=transaction_id,
+            category=category.strip(),
+            user_id=user_id
+        )
+
+        if not success:
+            raise ValueError(f"Transaction with ID {transaction_id} not found or feedback storage failed")
+
+        return {
+            "transaction_id": transaction_id,
+            "category": category.strip(),
+            "status": "success",
+            "message": "Feedback stored successfully. This will be used for future categorizations."
         }

@@ -16,6 +16,8 @@ from app.schemas.transaction_schema import (
     AnalyticsSummaryResponse,
     CategoryBreakdown,
     UniqueCategoriesResponse,
+    UpdateCategoryRequest,
+    UpdateCategoryResponse,
 )
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -159,6 +161,58 @@ async def get_unique_categories(
     except Exception as e:
         raise InternalServerErrorException(
             message="Failed to get categories", errors=[str(e)]
+        )
+
+
+@router.post(
+    "/{transaction_id}/feedback",
+    status_code=status.HTTP_200_OK,
+    summary="Submit category feedback",
+    description="Submit feedback about a transaction's category. This feedback will be used for future categorizations of similar transactions. The transaction itself is not updated.",
+)
+async def submit_category_feedback(
+    request: Request,
+    transaction_id: str,
+    update_request: UpdateCategoryRequest,
+    service: TransactionService = Depends(get_transaction_service)
+):
+    """Store user feedback for future categorizations (does not update transaction)"""
+    try:
+        # Get user_id from JWT token (set by middleware)
+        user_id = None
+        if hasattr(request.state, 'user'):
+            user_id = request.state.user.get('user_id') or request.state.user.get('sub')
+        
+        if not user_id:
+            raise BadRequestException(
+                message="User authentication required",
+                errors=["User ID not found in token"]
+            )
+
+        # Store user feedback
+        result = service.store_user_feedback(
+            transaction_id=transaction_id,
+            category=update_request.category,
+            user_id=user_id
+        )
+
+        response_data = UpdateCategoryResponse(**result)
+
+        resp = ResponseBody(
+            message="Feedback stored successfully. This will be used for future categorizations.",
+            errors=[],
+            data=response_data.model_dump(),
+        )
+        return JSONResponse(status_code=status.HTTP_200_OK, content=resp.model_dump())
+
+    except ValueError as e:
+        raise BadRequestException(
+            message="Failed to store feedback",
+            errors=[str(e)]
+        )
+    except Exception as e:
+        raise InternalServerErrorException(
+            message="Failed to store feedback", errors=[str(e)]
         )
 
 

@@ -121,3 +121,41 @@ class TransactionRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    def store_user_feedback(
+        self,
+        transaction_id: str,
+        category: str,
+        user_id: Optional[str] = None
+    ) -> bool:
+        """
+        Store user feedback for future categorizations (does not update transaction).
+
+        Args:
+            transaction_id: Transaction ID to get description from
+            category: Category feedback from user
+            user_id: User ID who provided the feedback
+
+        Returns:
+            True if feedback was stored successfully, False otherwise
+        """
+        pass
+
+    @abstractmethod
+    def get_user_feedback(
+        self,
+        description: str,
+        user_id: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Get user feedback category for a transaction description.
+
+        Args:
+            description: Transaction description to check
+            user_id: Optional user ID to filter by (if None, checks global feedback)
+
+        Returns:
+            Category from user feedback if found, None otherwise
+        """
+        pass
+

@@ -122,3 +122,27 @@ class UniqueCategoriesResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class UpdateCategoryRequest(BaseModel):
+    """Schema for submitting category feedback"""
+    category: str = Field(..., description="Category feedback from user", min_length=1)
+
+    @field_validator('category')
+    @classmethod
+    def validate_category(cls, v):
+        """Validate that category is not empty"""
+        if not v or not v.strip():
+            raise ValueError("Category cannot be empty")
+        return v.strip()
+
+
+class UpdateCategoryResponse(BaseModel):
+    """Schema for feedback response"""
+    transaction_id: str = Field(..., description="Transaction ID that feedback was provided for")
+    category: str = Field(..., description="Category feedback that was stored")
+    status: str = Field(..., description="Feedback status")
+    message: str = Field(..., description="Response message")
+
+    class Config:
+        from_attributes = True
+

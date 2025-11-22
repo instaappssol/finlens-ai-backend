@@ -255,3 +255,110 @@ class MongoTransactionRepository(TransactionRepository):
             "outflows_by_category": outflows_list,
         }
 
+    def store_user_feedback(
+        self,
+        transaction_id: str,
+        category: str,
+        user_id: Optional[str] = None
+    ) -> bool:
+        """Store user feedback for future categorizations (does not update transaction)"""
+        try:
+            # Validate transaction_id
+            if not ObjectId.is_valid(transaction_id):
+                return False
+
+            # Get transaction to extract description for feedback
+            transaction = self.collection.find_one({"_id": ObjectId(transaction_id)})
+            if not transaction:
+                return False
+
+            description = transaction.get("description", "")
+            if not description:
+                return False  # Need description to store feedback
+
+            # Store user feedback in user_feedback collection
+            feedback_collection = self.db["user_feedback"]
+            
+            # Normalize description for matching (same as merchant corrections)
+            normalized_desc = self._normalize_description(description)
+            
+            # Check if feedback already exists
+            existing_feedback = feedback_collection.find_one({
+                "normalized_description": normalized_desc,
+                "user_id": user_id
+            })
+
+            feedback_doc = {
+                "normalized_description": normalized_desc,
+                "original_description": description,
+                "category": category,
+                "user_id": user_id,
+                "transaction_id": transaction_id,  # Store reference to original transaction
+                "updated_at": datetime.now()
+            }
+
+            if existing_feedback:
+                # Update existing feedback
+                feedback_collection.update_one(
+                    {"_id": existing_feedback["_id"]},
+                    {"$set": feedback_doc}
+                )
+            else:
+                # Insert new feedback
+                feedback_doc["created_at"] = datetime.now()
+                feedback_collection.insert_one(feedback_doc)
+
+            return True
+
+        except Exception as e:
+            print(f"Error storing user feedback: {e}")
+            return False
+
+    def get_user_feedback(
+        self,
+        description: str,
+        user_id: Optional[str] = None
+    ) -> Optional[str]:
+        """Get user feedback category for a transaction description"""
+        try:
+            if not description:
+                return None
+
+            feedback_collection = self.db["user_feedback"]
+            normalized_desc = self._normalize_description(description)
+
+            # First try to find user-specific feedback
+            if user_id:
+                feedback = feedback_collection.find_one({
+                    "normalized_description": normalized_desc,
+                    "user_id": user_id
+                })
+                if feedback:
+                    return feedback.get("category")
+
+            # Fallback to global feedback (user_id is None)
+            feedback = feedback_collection.find_one({
+                "normalized_description": normalized_desc,
+                "user_id": None
+            })
+            if feedback:
+                return feedback.get("category")
+
+            return None
+
+        except Exception as e:
+            print(f"Error getting user feedback: {e}")
+            return None
+
+    @staticmethod
+    def _normalize_description(description: str) -> str:
+        """Normalize description for matching (same logic as merchant corrections)"""
+        import re
+        if not description:
+            return ""
+        # Convert to lowercase, remove special chars, normalize spaces
+        normalized = description.lower()
+        normalized = re.sub(r"[^a-z0-9]+", " ", normalized)
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return normalized
+
