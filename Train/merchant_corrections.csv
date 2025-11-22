@@ -100,12 +100,12 @@ OYO rms hyd,OYO Rooms,Dining
 airbnb stay#882,Airbnb,Dining
 air bnb-book9921,Airbnb,Dining
 airBnB_Hyd_Trip,Airbnb,Dining
-mmt hotel txn22,MakeMyTrip,Dining
-mmt*stay#551,MakeMyTrip,Dining
-makeMYtrip travel,MakeMyTrip,Dining
-ixigo ticket221,Ixigo,Entertainment
-ixgO bus-hyd,Ixigo,Entertainment
-Ixigo*trip#2211,Ixigo,Entertainment
+mmt hotel txn22,MakeMyTrip,Travel
+mmt*stay#551,MakeMyTrip,Travel
+makeMYtrip travel,MakeMyTrip,Travel
+ixigo ticket221,Ixigo,Travel
+ixgO bus-hyd,Ixigo,Travel
+Ixigo*trip#2211,Ixigo,Travel
 minecraft game 551,Minecraft,Entertainment
 minecrafT-topup99,Minecraft,Entertainment
 mcraft pass txn,Minecraft,Entertainment
@@ -394,12 +394,12 @@ shpstop#771,Shoppers Stop,Shopping
 treebo-BLR hotel,Treebo,Dining
 trebo stay#551,Treebo,Dining
 treeboIND 221,Treebo,Dining
-ixigo bus#882,Ixigo,Entertainment
-ixg booking 221,Ixigo,Entertainment
-ixg flt#551,Ixigo,Entertainment
-make my trip 551,MakeMyTrip,Dining
-mmt-book#771,MakeMyTrip,Dining
-mmt htl 2211,MakeMyTrip,Dining
+ixigo bus#882,Ixigo,Travel
+ixg booking 221,Ixigo,Travel
+ixg flt#551,Ixigo,Travel
+make my trip 551,MakeMyTrip,Travel
+mmt-book#771,MakeMyTrip,Travel
+mmt htl 2211,MakeMyTrip,Travel
 redbus tkt#551,Redbus,Travel
 rdbs hyd-blr22,Redbus,Travel
 redBus india 771,Redbus,Travel
