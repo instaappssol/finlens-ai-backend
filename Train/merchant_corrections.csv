@@ -4,3 +4,148 @@ BBASKT MUMBAI,Big Basket,Groceries
 BBasket,Big Basket,Groceries
 APOL PHARM BANG,Apollo Pharmacy,Healthcare
 Flpkrt,Flipkart,Shopping
+AMZN PYMT BLR,Amazon,Shopping
+AMAZON-ORDER-55821,Amazon,Shopping
+AMZN*ONLINE#9921,Amazon,Shopping
+AMZ-PURCHASE-IND,Amazon,Shopping
+AMAZON TXN 88231,Amazon,Shopping
+AMZ DIGITAL CHARGE,Amazon,Shopping
+AMZ*SHOP 1092,Amazon,Shopping
+AMZN-MKTPLACE-4481,Amazon,Shopping
+AMAZON PRIME BILL,Amazon,Entertainment
+INSTA-AMAZON ODR 211,Amazon,Shopping
+SWIGGY*FOOD#4432,Swiggy,Dining
+SWIGGY INSTAMART 772,Swiggy,Dining
+SWIGGY-ORDER-9981,Swiggy,Dining
+SWIGGY GEN TXN 121,Swiggy,Dining
+ZOMATO*FOOD#8821,Zomato,Dining
+ZOMATO ORDER 1131,Zomato,Dining
+ZOM*MEAL 7712,Zomato,Dining
+ZOMATO-PAY-882,Zomato,Dining
+ZOM DINE CHARGE 441,Zomato,Dining
+UBER TRIP 2211,Uber,Travel
+UBER*RIDE#9912,Uber,Travel
+UBER INDIA 412,Uber,Travel
+UBER AUTO 8821,Uber,Travel
+OLA*CAB#7721,Ola,Travel
+OLA RIDE 551,Ola,Travel
+OLA SHARE TXN 8820,Ola,Travel
+MERU CAB 119,Meru,Travel
+MERU-BOOKING-9812,Meru,Travel
+DOMINOS*PIZZA#1101,Dominos,Dining
+DOMINO'S ORDER 8812,Dominos,Dining
+DOMINOS TXN 112,Dominos,Dining
+PIZZAHUT*ORDER#981,Pizza Hut,Dining
+PIZZA HUT ODR 2211,Pizza Hut,Dining
+PIZZAHUT TXN 551,Pizza Hut,Dining
+PVR TICKET#991,PVR Cinemas,Entertainment
+PVR CINEMAS TXN 811,PVR Cinemas,Entertainment
+INOX MOVIE 221,INOX,Entertainment
+INOX*SEAT-2201,INOX,Entertainment
+CINEPOLIS*MOVIE#188,Cinepolis,Entertainment
+CINEPOLIS TXN 551,Cinepolis,Entertainment
+HOTSTAR RENEWAL 881,Hotstar,Entertainment
+DISNEYHOTSTAR#992,Hotstar,Entertainment
+NETFLIX SUB 299,Netflix,Entertainment
+NETFLIX*RENT#112,Netflix,Entertainment
+PRIMEVIDEO*CHG#119,Amazon Prime,Entertainment
+AMZ PRIME VIDEO 441,Amazon Prime,Entertainment
+ZEE5 STREAM 882,ZEE5,Entertainment
+SONYLIV PLAN 2211,SonyLIV,Entertainment
+BIGBASKET*BUY#7171,BigBasket,Groceries
+BIGBASKET ODR 112,BigBasket,Groceries
+BB-DAILY-7722,BigBasket,Groceries
+GROFERS*ORDER#881,Grofers,Groceries
+GROFERS TXN 992,Grofers,Groceries
+FLIPKART*SHOP#771,Flipkart,Shopping
+FLIPKART ODR 551,Flipkart,Shopping
+FKRT-SHOP-1291,Flipkart,Shopping
+MYNTRA*FASHION#1121,Myntra,Shopping
+MYNTRA TXN 882,Myntra,Shopping
+MYN-FASHION 1109,Myntra,Shopping
+NYKAA*BEAUTY#991,Nykaa,Shopping
+NYKAA ODR 2211,Nykaa,Shopping
+SNAPDEAL ORDER 881,Snapdeal,Shopping
+SNAPDEAL*TXN#119,Snapdeal,Shopping
+PANTALOONS BILL 551,Pantaloons,Shopping
+LIFESTYLE CHARGE 882,Lifestyle,Shopping
+SHOPSTOP*ODR#111,Shoppers Stop,Shopping
+TREEBO HOTEL 221,Treebo,Dining
+TREEBO-STAY-119,Treebo,Dining
+OYO ROOM 8821,OYO Rooms,Dining
+OYO ROOMS TXN 551,OYO Rooms,Dining
+AIRBNB*TRIP#882,Airbnb,Dining
+AIRBNB STAY 771,Airbnb,Dining
+MAKEMYTRIP*BOOK#211,MakeMyTrip,Dining
+MMT HOTEL 551,MakeMyTrip,Dining
+IXIGO TICKET 8821,Ixigo,Entertainment
+MINECRAFT GAME 1191,Minecraft,Entertainment
+COD MOBILE 551,Call of Duty Mobile,Entertainment
+PUBGM*PASS#882,PUBG Mobile,Entertainment
+ROBLOX CREDIT 551,Roblox,Others
+UDEMY COURSE 1121,Udemy,Others
+COURSERA FEE 8821,Coursera,Others
+UNACADEMY*PLAN#991,Unacademy,Others
+VEDANTU CLASS 551,Vedantu,Others
+BYJUS LEARN 2211,BYJU'S,Others
+FREEFIRE*TOPUP#771,Free Fire,Others
+AMAZONPAY*LOAD#112,Amazon Pay,Transfers
+AMAZON PAY 771,Amazon Pay,Transfers
+NOBROKER RENT 881,NoBroker,Transfers
+NESTAWAY RENT 551,Nestaway,Transfers
+ICICI BANK IMPS 2211,ICICI Bank,Transfers
+ICICI CREDIT PMT 881,ICICI Bank,Transfers
+HDFC BANK ATM 551,HDFC Bank,Transfers
+HDFC IMPS 112,HDFC Bank,Transfers
+SBI-UPI#2211,SBI,Transfers
+SBI TXN 9912,SBI,Transfers
+LIC PREMIUM 771,LIC,Transfers
+SBI LIFE 882,SBI Life,Transfers
+ICICI PRU PREMIUM 551,ICICI Prudential,Transfers
+MAKE MY TRIP BUS 882,MakeMyTrip Bus,Travel
+RED BUS TICKET 221,RedBus,Travel
+ABHIBUS*BOOK#551,AbhiBus,Travel
+GOIBIBO*TRIP#119,Goibibo,Travel
+PAYTM BUS 771,Paytm Bus,Travel
+YATRA TRAVEL 1121,Yatra,Travel
+EASEMYTRIP TICKET 221,EaseMyTrip,Travel
+CLEARTRIP AIR 551,Cleartrip,Travel
+RAPIDO RIDE 881,Rapido,Travel
+JUGNOO AUTO 991,Jugnoo,Travel
+ADANI GAS BILL 221,Adani Gas,Utilities
+AIRTEL BROADBAND 551,Airtel Broadband,Utilities
+JIO FIBER 881,Jio Fiber,Utilities
+JIO RECHARGE 551,Jio,Utilities
+BSNL BROADBAND 771,BSNL Broadband,Utilities
+HYD WATER BRD 119,Hyderabad Water Board,Utilities
+TATA POWER BILL 881,Tata Power,Utilities
+MSEDCL ELEC 551,MSEDCL,Utilities
+HATHWAY INTERNET 221,Hathway,Utilities
+VODAFONE RECH 551,Vodafone,Utilities
+BHARAT GAS CYL 771,Bharat Gas,Utilities
+CESC POWER 881,CESC,Utilities
+MAHANAGAR GAS 991,Mahanagar Gas,Utilities
+GUJARAT GAS 551,Gujarat Gas,Utilities
+INDRAPRASTHA GAS 221,Indraprastha Gas,Utilities
+DELHI JAL BOARD 551,Delhi Jal Board,Utilities
+CHENNAI METRO WATER 881,Chennai Metro Water,Utilities
+MUMBAI WATER 221,Mumbai Water,Utilities
+APOLLO PHARMACY 551,Apollo pharmacy,Healthcare
+APOLLO MEDS 881,Apollo pharmacy,Healthcare
+HOSPITAL BILL 119,hospital,Healthcare
+HOSPITAL-PAY#882,hospital,Healthcare
+SPI CINEMAS TICKET 551,SPI Cinemas,Entertainment
+CARNIVAL CINEMAS 771,Carnival Cinemas,Entertainment
+FABHOTELS STAY 551,Fab Hotels,Dining
+OYO LIFE RENT 551,OYO Life,Transfers
+HOUSING.COM FEE 771,Housing.com,Transfers
+HDFC LIFE PREM 991,HDFC Life,Transfers
+MAX LIFE PREM 221,Max Life,Transfers
+MAKE MY TRIP TAXI 551,MakeMyTrip,Dining
+TREEBO RESV 882,Treebo,Dining
+FOODPANDA ORDER 771,Foodpanda,Dining
+UBEREATS*MEAL#551,Uber Eats,Dining
+NATURES BASKET 991,Nature's Basket,Groceries
+AMAZON PANTRY 551,Amazon Pantry,Groceries
+FLIPKART SUPERMART 771,Flipkart Supermart,Groceries
+BIG BASKET BILL 551,Big Basket,Groceries
