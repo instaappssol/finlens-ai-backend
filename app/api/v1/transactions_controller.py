@@ -15,6 +15,7 @@ from app.schemas.transaction_schema import (
     CategorizationStats,
     AnalyticsSummaryResponse,
     CategoryBreakdown,
+    UniqueCategoriesResponse,
 )
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -125,6 +126,39 @@ async def get_analytics_summary(
     except Exception as e:
         raise InternalServerErrorException(
             message="Failed to get analytics summary", errors=[str(e)]
+        )
+
+
+@router.get(
+    "/categories",
+    status_code=status.HTTP_200_OK,
+    summary="Get unique categories from merchant knowledge base",
+    description="Get a list of all unique categories available in the merchant knowledge base.",
+)
+async def get_unique_categories(
+    request: Request,
+    categorization_service: CategorizationService = Depends(get_categorization_service)
+):
+    """Get unique categories from the merchant knowledge base"""
+    try:
+        # Get unique categories from merchant knowledge base
+        categories = categorization_service.get_unique_categories_from_kb()
+        
+        response_data = UniqueCategoriesResponse(
+            categories=categories,
+            count=len(categories)
+        )
+
+        resp = ResponseBody(
+            message="Categories retrieved successfully",
+            errors=[],
+            data=response_data.model_dump(),
+        )
+        return JSONResponse(status_code=status.HTTP_200_OK, content=resp.model_dump())
+
+    except Exception as e:
+        raise InternalServerErrorException(
+            message="Failed to get categories", errors=[str(e)]
         )
 
 

@@ -433,3 +433,19 @@ class CategorizationService:
             "categories": df["label"].unique().tolist(),
         }
 
+    def get_unique_categories_from_kb(self) -> List[str]:
+        """
+        Get unique categories from the merchant knowledge base.
+
+        Returns:
+            List of unique category names sorted alphabetically
+        """
+        # Get unique categories from merchant knowledge base records
+        categories = set()
+        for record in self.default_merchant_kb.records:
+            if record.category:
+                categories.add(record.category)
+        
+        # Return sorted list
+        return sorted(list(categories))
+

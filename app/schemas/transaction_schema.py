@@ -113,3 +113,12 @@ class CategoryTransactionsResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class UniqueCategoriesResponse(BaseModel):
+    """Schema for unique categories response"""
+    categories: List[str] = Field(..., description="List of unique categories from merchant knowledge base")
+    count: int = Field(..., description="Number of unique categories")
+
+    class Config:
+        from_attributes = True
+
