@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.api.routes import router
 from app.core.handlers import register_exception_handlers
 from app.core.middleware import TokenAuthMiddleware
+from app.core.admin_middleware import AdminAuthMiddleware
 
 
 @asynccontextmanager
@@ -69,9 +70,14 @@ app.openapi = custom_openapi
 # Register exception handlers
 register_exception_handlers(app)
 
-# Register token auth middleware. Exempt public endpoints (login, signup, health, and docs).
+# Register user token auth middleware. Exempt public endpoints (login, signup, health, and docs).
 app.add_middleware(
     TokenAuthMiddleware,
+)
+
+# Register admin auth middleware. Only applies to /admin/* routes.
+app.add_middleware(
+    AdminAuthMiddleware,
 )
 
 app.include_router(router)

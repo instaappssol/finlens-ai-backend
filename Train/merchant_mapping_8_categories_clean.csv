@@ -1,0 +1,10 @@
+Category,Merchants
+Dining,"['Treebo', 'Uber Eats', 'Foodpanda', ""Domino's"", 'Dominos', 'pizza hut','Airbnb', 'Fab Hotels', 'Swiggy', 'OYO Rooms', 'MakeMyTrip', 'Zomato']"
+Entertainment,"['Hotstar','Carnival Cinemas', 'INOX', 'SPI Cinemas', 'Cinepolis', 'PVR Cinemas', 'Netflix', 'Call of Duty Mobile', 'Minecraft', 'Amazon Prime', 'ZEE5', 'PUBG Mobile', 'Ixigo',   'SonyLIV'   ]"
+Groceries,"['Flipkart Supermart', 'Amazon Pantry', 'BigBasket', 'Grofers', ""Nature's Basket"", 'Big Basket']"
+Others,"['Roblox', 'Udemy','Coursera', 'Unacademy', 'Vedantu',""BYJU'S"", 'Free Fire']"
+Shopping,"['Flipkart', 'Myntra', 'Nykaa', 'Snapdeal', 'Amazon', 'Pantaloons', 'Lifestyle', 'Flipkart',  'Shoppers Stop' ]"
+Transfers,"['Amazon Pay','Airbnb', 'Axis Bank', 'Max Life', 'NoBroker', 'Nestaway', 'ICICI Bank', 'HDFC Bank', 'OYO Life', 'Housing.com', 'HDFC Life', 'SBI', 'Bajaj Finserv', 'SBI Life', 'LIC', 'ICICI Prudential']"
+Travel,"['MakeMyTrip Bus', 'Meru', 'Ola', 'Jugnoo', 'RedBus', 'Uber', 'Rapido', 'Goibibo', 'Paytm Bus', 'AbhiBus', 'Yatra', 'EaseMyTrip','Cleartrip']"
+Utilities,"['Adani Gas', 'Airtel Broadband', 'BSNL', 'BSES', 'Indraprastha Gas', 'Delhi Jal Board', 'Mahanagar Gas', 'MSEDCL', 'Hyderabad Water Board', 'Tata Power', 'Jio Fiber', 'ACT Fibernet', 'Airtel', 'Bharat Gas', 'Bangalore Water Supply', 'Idea', 'BSNL Broadband', 'Reliance Energy', 'Chennai Metro Water', 'Hathway', 'Vodafone', 'Mumbai Water', 'Jio', 'CESC', 'Gujarat Gas']"
+Healthcare,"['Apollo pharmacy','hospital']"

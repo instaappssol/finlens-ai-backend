@@ -11,7 +11,10 @@ import pandas as pd
 from app.services.model_manager import ModelManager
 
 # Import the ML model from app.ml
-from app.ml.transaction_categorizer import TransactionCategorizer, PredictionResult
+from app.ml.transaction_categorization_engine import (
+    TransactionCategorizationEngine,
+    MerchantKnowledgeBase,
+)
 
 
 class CategorizationService:
@@ -37,13 +40,29 @@ class CategorizationService:
             )
         else:
             self.model_manager = model_manager
-        self.model: Optional[TransactionCategorizer] = None
+        self.model: Optional[TransactionCategorizationEngine] = None
         self.model_name = "transaction_categorizer"
         self.model_loaded = False
+        self.db = db  # Store DB reference for loading merchant KB
+        
+        # Create default empty merchant KB (will be loaded from MongoDB if available)
+        self.default_merchant_kb = MerchantKnowledgeBase(
+            merchants=[],
+            corrections=None
+        )
+        
+        # Try to load merchant KB from MongoDB
+        if db is not None:
+            try:
+                self.default_merchant_kb = MerchantKnowledgeBase.from_mongodb(
+                    db, collection_name="merchant_knowledge_base"
+                )
+            except Exception as e:
+                print(f"[WARN] Could not load merchant KB from MongoDB: {e}. Using empty KB.")
 
     def load_model(self, version: Optional[str] = None) -> bool:
         """
-        Load the categorization model from disk.
+        Load the categorization model from GridFS.
 
         Args:
             version: Model version to load (default: latest)
@@ -52,22 +71,32 @@ class CategorizationService:
             True if loaded successfully, False otherwise
         """
         try:
-            if TransactionCategorizer is None:
-                raise ImportError("TransactionCategorizer not available")
-
+            # Load model from GridFS (joblib serialized engine)
             self.model = self.model_manager.load_model(
                 self.model_name, version=version, use_joblib=True
             )
-            self.model_loaded = True
-            return True
+            
+            if isinstance(self.model, TransactionCategorizationEngine):
+                self.model_loaded = True
+                return True
+            else:
+                raise ValueError(f"Unexpected model data type: {type(self.model)}")
         except FileNotFoundError as e:
             print(
-                f"Model file not found: {e}. Train a model first using /train-model endpoint."
+                f"[INFO] Model file not found: {e}. Train a model first using /admin/train-model endpoint."
             )
             self.model_loaded = False
             return False
+        except ValueError as e:
+            # Model not found in metadata - this is expected if no model has been trained yet
+            if "not found in metadata" in str(e):
+                print(f"[INFO] No model found. Train a model first using /admin/train-model endpoint.")
+            else:
+                print(f"[WARN] Error loading model: {e}")
+            self.model_loaded = False
+            return False
         except Exception as e:
-            print(f"Error loading model: {e}")
+            print(f"[WARN] Error loading model: {e}")
             self.model_loaded = False
             return False
 
@@ -105,17 +134,26 @@ class CategorizationService:
             raise ValueError("Transaction must have 'amount' field")
 
         # Set defaults
-        transaction.setdefault("transaction_type", "UNKNOWN")
-        transaction.setdefault("timestamp", "")
-
-        # Predict
-        result: PredictionResult = self.model.predict_one(transaction)
+        transaction.setdefault("transaction_type", transaction.get("type", "UNKNOWN"))
+        transaction.setdefault("timestamp", transaction.get("timestamp", ""))
+        
+        # Convert to format expected by engine
+        engine_txn = {
+            "description": transaction["description"],
+            "amount": float(transaction["amount"]),
+            "timestamp": transaction.get("timestamp", ""),
+            "type": transaction.get("transaction_type", "UNKNOWN"),
+        }
+        
+        # Predict using batch method (engine uses predict_batch)
+        results = self.model.predict_batch([engine_txn])
+        result = results[0]
 
         return {
-            "transaction_id": result.transaction_id,
-            "category": result.category,
-            "confidence_score": result.confidence_score,
-            "model_version": result.model_version,
+            "transaction_id": transaction.get("transaction_id"),
+            "category": result["predicted_category"],
+            "confidence_score": result["prediction_confidence"],
+            "model_version": "v1.0.0",
         }
 
     def predict_batch(self, transactions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -136,6 +174,7 @@ class CategorizationService:
         labels: List[str],
         save_model: bool = True,
         version: str = "latest",
+        merchant_kb: Optional[MerchantKnowledgeBase] = None,
     ) -> Dict[str, Any]:
         """
         Train a new categorization model from data.
@@ -145,13 +184,11 @@ class CategorizationService:
             labels: List of category labels (can be extracted from training_data)
             save_model: Whether to save the trained model
             version: Version string for the saved model
+            merchant_kb: Optional MerchantKnowledgeBase (uses default empty if not provided)
 
         Returns:
             Training results dict with metrics
         """
-        if TransactionCategorizer is None:
-            raise ImportError("TransactionCategorizer not available")
-
         # Create DataFrame
         df = pd.DataFrame(training_data)
 
@@ -163,9 +200,40 @@ class CategorizationService:
                 "Training data must include 'label' field or provide labels list"
             )
 
-        # Initialize and train model
-        self.model = TransactionCategorizer()
-        self.model.fit_from_dataframe(df)
+        # Use provided merchant KB, try to load from MongoDB, or use default empty one
+        if merchant_kb is not None:
+            kb = merchant_kb
+        elif self.db is not None:
+            try:
+                kb = MerchantKnowledgeBase.from_mongodb(
+                    self.db, collection_name="merchant_knowledge_base"
+                )
+            except Exception as e:
+                print(f"[WARN] Could not load merchant KB from MongoDB: {e}. Using default.")
+                kb = self.default_merchant_kb
+        else:
+            kb = self.default_merchant_kb
+
+        # Prepare DataFrame for engine (map columns)
+        engine_df = df.copy()
+        engine_df["category"] = engine_df["label"]  # Engine expects 'category' column
+        if "timestamp" not in engine_df.columns:
+            engine_df["timestamp"] = ""
+        if "type" not in engine_df.columns:
+            engine_df["type"] = engine_df.get("transaction_type", "UNKNOWN")
+
+        # Train model using engine
+        self.model = TransactionCategorizationEngine.from_training_data(
+            df=engine_df,
+            merchant_kb=kb,
+            label_col="category",
+            description_col="description",
+            amount_col="amount",
+            timestamp_col="timestamp" if "timestamp" in engine_df.columns else None,
+            type_col="type" if "type" in engine_df.columns else None,
+            num_epochs=10,
+            batch_size=32,
+        )
 
         # Save model if requested
         if save_model:
@@ -174,12 +242,14 @@ class CategorizationService:
                 "categories": df["label"].unique().tolist(),
                 "training_date": pd.Timestamp.now().isoformat(),
             }
+            
+            # Save engine directly to GridFS using joblib
             self.model_manager.save_model(
                 self.model,
                 self.model_name,
                 version=version,
                 metadata=metadata,
-                use_joblib=True,
+                use_joblib=True,  # Use joblib (handles threading objects better)
             )
 
         self.model_loaded = True
@@ -204,7 +274,35 @@ class CategorizationService:
         if not self.model_loaded or self.model is None:
             raise RuntimeError("Model not loaded")
 
-        return self.model.explain_one(transaction)
+        # Get prediction first
+        pred_result = self.predict(transaction)
+        
+        # Convert to engine format
+        engine_txn = {
+            "description": transaction.get("description", ""),
+            "amount": float(transaction.get("amount", 0)),
+            "timestamp": transaction.get("timestamp", ""),
+            "type": transaction.get("transaction_type", "UNKNOWN"),
+        }
+        
+        # Get detailed prediction from engine
+        results = self.model.predict_batch([engine_txn])
+        result = results[0]
+        
+        # Return explanation with available info
+        return {
+            "transaction_id": transaction.get("transaction_id"),
+            "predicted_category": pred_result["category"],
+            "confidence_score": pred_result["confidence_score"],
+            "top_factors": [
+                {"feature": "normalized_merchant", "contribution": result.get("merchant_confidence", 0.0)},
+                {"feature": "kb_category", "contribution": 0.8 if result.get("kb_category") else 0.0},
+            ],
+            "model_version": pred_result["model_version"],
+            "normalized_merchant": result.get("normalized_merchant"),
+            "kb_category": result.get("kb_category"),
+            "merchant_confidence": result.get("merchant_confidence"),
+        }
 
     def load_user_model(self, user_id: str, version: Optional[str] = None) -> bool:
         """
@@ -221,15 +319,16 @@ class CategorizationService:
 
         try:
             # Try to load user-specific model
-            if TransactionCategorizer is None:
-                raise ImportError("TransactionCategorizer not available")
-
             self.model = self.model_manager.load_model(
                 user_model_name, version=version, use_joblib=True
             )
-            self.model_loaded = True
-            self.model_name = user_model_name
-            return True
+            
+            if isinstance(self.model, TransactionCategorizationEngine):
+                self.model_loaded = True
+                self.model_name = user_model_name
+                return True
+            else:
+                raise ValueError(f"Unexpected model data type: {type(self.model)}")
         except Exception:
             # Fallback to global model
             return self.load_model()
@@ -241,6 +340,7 @@ class CategorizationService:
         labels: List[str],
         save_model: bool = True,
         version: str = "latest",
+        merchant_kb: Optional[MerchantKnowledgeBase] = None,
     ) -> Dict[str, Any]:
         """
         Train a user-specific model.
@@ -251,13 +351,11 @@ class CategorizationService:
             labels: List of category labels
             save_model: Whether to save the trained model
             version: Version string for the saved model
+            merchant_kb: Optional MerchantKnowledgeBase (uses default empty if not provided)
 
         Returns:
             Training results dict with metrics
         """
-        if TransactionCategorizer is None:
-            raise ImportError("TransactionCategorizer not available")
-
         # Create DataFrame
         df = pd.DataFrame(training_data)
 
@@ -269,24 +367,58 @@ class CategorizationService:
                 "Training data must include 'label' field or provide labels list"
             )
 
-        # Initialize and train model
-        self.model = TransactionCategorizer()
-        self.model.fit_from_dataframe(df)
+        # Use provided merchant KB, try to load from MongoDB, or use default empty one
+        if merchant_kb is not None:
+            kb = merchant_kb
+        elif self.db is not None:
+            try:
+                kb = MerchantKnowledgeBase.from_mongodb(
+                    self.db, collection_name="merchant_knowledge_base"
+                )
+            except Exception as e:
+                print(f"[WARN] Could not load merchant KB from MongoDB: {e}. Using default.")
+                kb = self.default_merchant_kb
+        else:
+            kb = self.default_merchant_kb
+
+        # Prepare DataFrame for engine
+        engine_df = df.copy()
+        engine_df["category"] = engine_df["label"]
+        if "timestamp" not in engine_df.columns:
+            engine_df["timestamp"] = ""
+        if "type" not in engine_df.columns:
+            engine_df["type"] = engine_df.get("transaction_type", "UNKNOWN")
+
+        # Train model using engine
+        self.model = TransactionCategorizationEngine.from_training_data(
+            df=engine_df,
+            merchant_kb=kb,
+            label_col="category",
+            description_col="description",
+            amount_col="amount",
+            timestamp_col="timestamp" if "timestamp" in engine_df.columns else None,
+            type_col="type" if "type" in engine_df.columns else None,
+            num_epochs=10,
+            batch_size=32,
+        )
 
         if save_model:
             user_model_name = f"transaction_categorizer_user_{user_id}"
+            
             metadata = {
                 "user_id": user_id,
                 "training_samples": len(training_data),
                 "categories": df["label"].unique().tolist(),
                 "training_date": pd.Timestamp.now().isoformat(),
             }
+            
+            # Save engine directly to GridFS using joblib
             self.model_manager.save_model(
                 self.model,
                 user_model_name,
                 version=version,
                 metadata=metadata,
-                use_joblib=True,
+                use_joblib=True,  # Use joblib (handles threading objects better)
             )
             self.model_name = user_model_name
 
@@ -301,9 +433,3 @@ class CategorizationService:
             "categories": df["label"].unique().tolist(),
         }
 
-    def get_model_info(self) -> Dict[str, Any]:
-        """Get information about the current model"""
-        try:
-            return self.model_manager.get_model_info(self.model_name)
-        except Exception as e:
-            return {"error": str(e), "loaded": self.model_loaded}

@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 from fastapi import status
 
 exempt_paths = [
+    "/admin/auth/login",
+    "/admin/auth/signup",
     "/auth/login",
     "/auth/signup",
     "/health",
@@ -17,10 +19,9 @@ exempt_paths = [
 ]
 
 
-class TokenAuthMiddleware(BaseHTTPMiddleware):
-    """Middleware to validate user JWT token on incoming requests.
+class AdminAuthMiddleware(BaseHTTPMiddleware):
+    """Middleware to validate admin JWT token on incoming requests.
 
-    Only applies to user routes (not admin routes).
     Exempt paths (public endpoints) can be passed via `exempt_paths` kwarg
     when registering the middleware (e.g. in `main.py`).
     """
@@ -30,11 +31,11 @@ class TokenAuthMiddleware(BaseHTTPMiddleware):
         self.exempt_paths = set(exempt_paths or [])
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        # Skip admin routes (handled by AdminAuthMiddleware)
+        # Only apply to admin routes
         path = request.url.path
-        if path.startswith("/admin/"):
+        if not path.startswith("/admin/"):
             return await call_next(request)
-        
+
         # Skip validation for exempt paths
         if path in self.exempt_paths:
             return await call_next(request)
@@ -78,7 +79,8 @@ class TokenAuthMiddleware(BaseHTTPMiddleware):
                 ).model_dump(),
             )
 
-        # Attach user info to request.state for downstream handlers
-        request.state.user = payload
+        # Attach admin info to request.state for downstream handlers
+        request.state.admin = payload
 
         return await call_next(request)
+

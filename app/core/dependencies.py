@@ -5,11 +5,15 @@ from fastapi import Request, Depends
 from app.core.db import get_db_from_request
 from app.repositories.transaction_repository import TransactionRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.admin_repository import AdminRepository
 from app.repositories.mongo_transaction_repository import MongoTransactionRepository
 from app.repositories.mongo_user_repository import MongoUserRepository
+from app.repositories.mongo_admin_repository import MongoAdminRepository
 from app.services.transactions_service import TransactionService
 from app.services.auth_service import AuthService
+from app.services.admin_auth_service import AdminAuthService
 from app.services.categorization_service import CategorizationService
+from app.ml.transaction_categorization_engine import MerchantKnowledgeBase
 
 
 def get_transaction_repository(request: Request) -> TransactionRepository:
@@ -63,14 +67,17 @@ def get_categorization_service(request: Request) -> CategorizationService:
         _categorization_service = CategorizationService(db=db)
         # Try to load existing model
         _categorization_service.load_model()
-    elif db is not None and hasattr(_categorization_service.model_manager, 'db') and _categorization_service.model_manager.db is None:
-        # Update database connection if it wasn't set before
-        _categorization_service.model_manager.db = db
-        _categorization_service.model_manager.use_gridfs = db is not None
-        if _categorization_service.model_manager.use_gridfs:
-            from gridfs import GridFS
-            _categorization_service.model_manager.gridfs = GridFS(db, collection="models")
-            _categorization_service.model_manager.metadata_collection = db["model_metadata"]
+    elif db is not None:
+        # Update database connection if it changed
+        if _categorization_service.db != db:
+            _categorization_service.db = db
+            # Reload merchant KB from new DB connection
+            try:
+                _categorization_service.default_merchant_kb = MerchantKnowledgeBase.from_mongodb(
+                    db, collection_name="merchant_knowledge_base"
+                )
+            except Exception:
+                pass
     
     return _categorization_service
 
@@ -108,4 +115,32 @@ def get_auth_service(
         AuthService instance
     """
     return AuthService(user_repository=user_repo)
+
+
+def get_admin_repository(request: Request) -> AdminRepository:
+    """
+    Get admin repository instance.
+
+    Args:
+        request: FastAPI request object
+
+    Returns:
+        AdminRepository instance
+    """
+    db = get_db_from_request(request)
+    return MongoAdminRepository(db)
+
+
+def get_admin_auth_service(request: Request) -> AdminAuthService:
+    """
+    Get admin authentication service instance.
+
+    Args:
+        request: FastAPI request object
+
+    Returns:
+        AdminAuthService instance
+    """
+    admin_repo = get_admin_repository(request)
+    return AdminAuthService(admin_repository=admin_repo)
 

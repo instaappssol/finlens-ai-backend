@@ -1,9 +1,11 @@
 import csv
 import io
+import ast
 from collections import Counter
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional, Any
 from bson import ObjectId
+import pandas as pd
 
 from app.repositories.transaction_repository import TransactionRepository
 
@@ -274,10 +276,6 @@ class TransactionService:
         except Exception as e:
             raise ValueError(f"Failed to parse CSV for training: {str(e)}")
 
-    def get_training_data_stats(self, user_id: Optional[str] = None) -> Dict:
-        """Get statistics about available training data"""
-        return self.transaction_repository.get_training_data_stats(user_id=user_id)
-
     def get_analytics_summary(
         self,
         year: int,
@@ -321,3 +319,166 @@ class TransactionService:
         )
         # Serialize for JSON response
         return [serialize_for_json(txn) for txn in transactions]
+
+    def upload_merchant_mappings(
+        self,
+        db,
+        file_content: bytes,
+        replace_existing: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Upload merchant mappings CSV to MongoDB collection merchant_knowledge_base.
+        
+        Args:
+            db: MongoDB database connection
+            file_content: Raw bytes of uploaded CSV file
+            replace_existing: Whether to replace existing mappings (default: append)
+            
+        Returns:
+            Dictionary with upload statistics
+            
+        Raises:
+            ValueError: If CSV parsing fails or required columns are missing
+        """
+        collection = db["merchant_knowledge_base"]
+        
+        # Read and parse CSV
+        df = pd.read_csv(io.BytesIO(file_content))
+        
+        # Validate required columns
+        if "Category" not in df.columns or "Merchants" not in df.columns:
+            raise ValueError("CSV must contain 'Category' and 'Merchants' columns")
+        
+        # Replace existing if requested
+        if replace_existing:
+            collection.delete_many({})
+        
+        inserted_count = 0
+        
+        # Parse each row
+        for _, row in df.iterrows():
+            category = str(row["Category"]).strip()
+            raw_merchants = row["Merchants"]
+            
+            if pd.isna(raw_merchants) or not category:
+                continue
+            
+            # Parse merchants list (can be Python list string or comma-separated)
+            if isinstance(raw_merchants, str) and raw_merchants.strip().startswith("["):
+                # Python-list-like string
+                try:
+                    merchant_list = ast.literal_eval(raw_merchants)
+                except Exception:
+                    merchant_list = [m.strip().strip('"').strip("'") for m in raw_merchants.split(",") if m.strip()]
+            elif isinstance(raw_merchants, str):
+                merchant_list = [m.strip().strip('"').strip("'") for m in raw_merchants.split(",") if m.strip()]
+            else:
+                merchant_list = [str(raw_merchants).strip()]
+            
+            # Remove empty strings
+            merchant_list = [m for m in merchant_list if m]
+            
+            if not merchant_list:
+                continue
+            
+            # Main merchant is the first one
+            main_merchant = merchant_list[0]
+            aliases = merchant_list[1:] if len(merchant_list) > 1 else []
+            
+            # Check if merchant already exists
+            existing = collection.find_one({"merchant": main_merchant, "category": category})
+            
+            if existing:
+                # Update with aliases
+                collection.update_one(
+                    {"merchant": main_merchant, "category": category},
+                    {"$set": {"merchants": aliases}}
+                )
+            else:
+                # Insert new document
+                collection.insert_one({
+                    "merchant": main_merchant,
+                    "category": category,
+                    "merchants": aliases
+                })
+                inserted_count += 1
+        
+        return {
+            "inserted_count": inserted_count,
+            "total_rows_processed": len(df),
+            "collection": "merchant_knowledge_base"
+        }
+
+    def upload_merchant_corrections(
+        self,
+        db,
+        file_content: bytes,
+        replace_existing: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Upload merchant corrections CSV to MongoDB collection merchant_corrections.
+        
+        Args:
+            db: MongoDB database connection
+            file_content: Raw bytes of uploaded CSV file
+            replace_existing: Whether to replace existing corrections (default: append)
+            
+        Returns:
+            Dictionary with upload statistics
+            
+        Raises:
+            ValueError: If CSV parsing fails or required columns are missing
+        """
+        collection = db["merchant_corrections"]
+        
+        # Read and parse CSV
+        df = pd.read_csv(io.BytesIO(file_content))
+        
+        # Validate required columns
+        required_cols = {"raw_description", "canonical_merchant", "canonical_category"}
+        if not required_cols.issubset(set(df.columns)):
+            raise ValueError(f"CSV must contain columns: {', '.join(required_cols)}")
+        
+        # Replace existing if requested
+        if replace_existing:
+            collection.delete_many({})
+        
+        inserted_count = 0
+        
+        # Parse each row
+        for _, row in df.iterrows():
+            raw_desc = str(row["raw_description"]).strip()
+            canon_merchant = str(row["canonical_merchant"]).strip()
+            canon_category = str(row["canonical_category"]).strip()
+            
+            if not raw_desc or not canon_merchant or not canon_category:
+                continue
+            
+            # Check if correction already exists
+            existing = collection.find_one({"raw_description": raw_desc})
+            
+            if existing:
+                # Update existing correction
+                collection.update_one(
+                    {"raw_description": raw_desc},
+                    {
+                        "$set": {
+                            "canonical_merchant": canon_merchant,
+                            "canonical_category": canon_category
+                        }
+                    }
+                )
+            else:
+                # Insert new correction
+                collection.insert_one({
+                    "raw_description": raw_desc,
+                    "canonical_merchant": canon_merchant,
+                    "canonical_category": canon_category
+                })
+                inserted_count += 1
+        
+        return {
+            "inserted_count": inserted_count,
+            "total_rows_processed": len(df),
+            "collection": "merchant_corrections"
+        }
