@@ -1,4 +1,4 @@
-description,amount,category,timestamp,type,Correct_category
+description,amount,category,timestamp,type,
 Airbnb 2BHK Flat Deposit,1525.39,Transfers,2023-08-19T03:32:00Z,Debit Card,
 Adani Gas Commercial Gas Connection,1495.4,Utilities,2023-08-19T04:37:00Z,UPI,
 MakeMyTrip Bus Semi-Sleeper,1267.71,Transportation,2023-08-19T05:52:00Z,UPI,
