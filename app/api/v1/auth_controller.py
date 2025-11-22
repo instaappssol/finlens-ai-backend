@@ -103,6 +103,7 @@ def login(
             message="User registered successfully",
             data=LoginResponse(
                 id=str(user["_id"]),
+                name=user.get("name", ""),
                 email=user["email"],
                 mobile_number=user["mobile_number"],
                 token=token,

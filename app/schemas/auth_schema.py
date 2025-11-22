@@ -82,6 +82,7 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     """Schema for login response"""
     id: str = Field(..., description="User ID")
+    name: str = Field(..., description="User's full name")
     email: str = Field(..., description="User's email address")
     mobile_number: str = Field(..., description="User's mobile number")
     token: str = Field(..., description="JWT access token")
