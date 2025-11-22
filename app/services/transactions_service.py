@@ -106,12 +106,11 @@ class TransactionService:
                         except (ValueError, TypeError):
                             amount = 0.0
 
+                        # Only send description and amount to the model
+                        # The model will use defaults for other fields
                         transaction_data = {
                             "description": row.get("description", ""),
                             "amount": amount,
-                            "transaction_type": row.get("transaction_type"),
-                            "currency": row.get("currency", "INR"),
-                            "timestamp": row.get("date") or row.get("timestamp", ""),
                         }
                         
                         # Get prediction
