@@ -359,6 +359,27 @@ raw_description,canonical_merchant,canonical_category
 AMZN PYMT BLR,Amazon,Shopping
 ```
 
+#### Delete All Transactions (Admin Only)
+```http
+DELETE /admin/transactions/all
+Authorization: Bearer <admin-token>
+```
+
+⚠️ **WARNING**: This endpoint deletes ALL transactions in the database for ALL users. This action cannot be undone. Use with extreme caution.
+
+**Response:**
+```json
+{
+  "message": "Successfully deleted 150 transaction(s) from database",
+  "errors": [],
+  "data": {
+    "deleted_count": 150,
+    "status": "success",
+    "message": "Successfully deleted 150 transaction(s) from database"
+  }
+}
+```
+
 ## 📁 Project Structure
 
 ```

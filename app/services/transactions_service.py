@@ -606,3 +606,20 @@ class TransactionService:
             "status": "success",
             "message": f"Successfully deleted {deleted_count} transaction(s)"
         }
+
+    def delete_all_transactions(
+        self
+    ) -> Dict[str, Any]:
+        """
+        Delete all transactions in the database (Admin only).
+
+        Returns:
+            Dictionary with deletion result
+        """
+        deleted_count = self.transaction_repository.delete_all_transactions()
+
+        return {
+            "deleted_count": deleted_count,
+            "status": "success",
+            "message": f"Successfully deleted {deleted_count} transaction(s) from database"
+        }

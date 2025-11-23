@@ -414,3 +414,17 @@ class MongoTransactionRepository(TransactionRepository):
             print(f"Error deleting user transactions: {e}")
             return 0
 
+    def delete_all_transactions(
+        self
+    ) -> int:
+        """Delete all transactions in the database (Admin only)"""
+        try:
+            # Delete all transactions
+            result = self.collection.delete_many({})
+
+            return result.deleted_count
+
+        except Exception as e:
+            print(f"Error deleting all transactions: {e}")
+            return 0
+

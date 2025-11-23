@@ -166,3 +166,13 @@ class DeleteAllTransactionsResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class DeleteAllTransactionsAdminResponse(BaseModel):
+    """Schema for admin delete all transactions response"""
+    deleted_count: int = Field(..., description="Number of transactions deleted")
+    status: str = Field(..., description="Deletion status")
+    message: str = Field(..., description="Response message")
+
+    class Config:
+        from_attributes = True
+

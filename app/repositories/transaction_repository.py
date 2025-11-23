@@ -195,3 +195,15 @@ class TransactionRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    def delete_all_transactions(
+        self
+    ) -> int:
+        """
+        Delete all transactions in the database (Admin only).
+
+        Returns:
+            Number of transactions deleted
+        """
+        pass
+

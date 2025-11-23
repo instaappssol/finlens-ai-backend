@@ -13,6 +13,7 @@ from app.services.categorization_service import CategorizationService
 from app.schemas.transaction_schema import (
     TrainingResponse,
     CategoryTransactionsResponse,
+    DeleteAllTransactionsAdminResponse,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -241,5 +242,34 @@ async def upload_merchant_corrections(
     except Exception as e:
         raise InternalServerErrorException(
             message="Failed to upload merchant corrections", errors=[str(e)]
+        )
+
+
+@router.delete(
+    "/transactions/all",
+    status_code=status.HTTP_200_OK,
+    summary="Delete all transactions in database (Admin Only)",
+    description="Delete all transaction records from the database. This action cannot be undone and affects all users.",
+)
+async def delete_all_transactions(
+    service: TransactionService = Depends(get_transaction_service)
+):
+    """Delete all transactions in the database (Admin Only)"""
+    try:
+        # Delete all transactions
+        result = service.delete_all_transactions()
+
+        response_data = DeleteAllTransactionsAdminResponse(**result)
+
+        resp = ResponseBody(
+            message=f"Successfully deleted {result['deleted_count']} transaction(s) from database",
+            errors=[],
+            data=response_data.model_dump(),
+        )
+        return JSONResponse(status_code=status.HTTP_200_OK, content=resp.model_dump())
+
+    except Exception as e:
+        raise InternalServerErrorException(
+            message="Failed to delete all transactions", errors=[str(e)]
         )
 
