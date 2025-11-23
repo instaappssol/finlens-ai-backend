@@ -145,3 +145,24 @@ class UpdateCategoryResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class DeleteTransactionResponse(BaseModel):
+    """Schema for delete transaction response"""
+    transaction_id: str = Field(..., description="Transaction ID that was deleted")
+    status: str = Field(..., description="Deletion status")
+    message: str = Field(..., description="Response message")
+
+    class Config:
+        from_attributes = True
+
+
+class DeleteAllTransactionsResponse(BaseModel):
+    """Schema for delete all transactions response"""
+    user_id: str = Field(..., description="User ID whose transactions were deleted")
+    deleted_count: int = Field(..., description="Number of transactions deleted")
+    status: str = Field(..., description="Deletion status")
+    message: str = Field(..., description="Response message")
+
+    class Config:
+        from_attributes = True
+

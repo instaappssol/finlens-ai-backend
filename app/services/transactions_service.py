@@ -547,3 +547,62 @@ class TransactionService:
             "status": "success",
             "message": "Feedback stored successfully. This will be used for future categorizations."
         }
+
+    def delete_transaction(
+        self,
+        transaction_id: str,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Delete a transaction by ID.
+
+        Args:
+            transaction_id: Transaction ID to delete
+            user_id: User ID to verify ownership
+
+        Returns:
+            Dictionary with deletion result
+        """
+        if not user_id:
+            raise ValueError("User ID is required to delete transaction")
+
+        success = self.transaction_repository.delete_transaction_by_id(
+            transaction_id=transaction_id,
+            user_id=user_id
+        )
+
+        if not success:
+            raise ValueError(f"Transaction with ID {transaction_id} not found or access denied")
+
+        return {
+            "transaction_id": transaction_id,
+            "status": "deleted",
+            "message": "Transaction deleted successfully"
+        }
+
+    def delete_all_user_transactions(
+        self,
+        user_id: str
+    ) -> Dict[str, Any]:
+        """
+        Delete all transactions for a user.
+
+        Args:
+            user_id: User ID whose transactions should be deleted
+
+        Returns:
+            Dictionary with deletion result
+        """
+        if not user_id:
+            raise ValueError("User ID is required")
+
+        deleted_count = self.transaction_repository.delete_all_user_transactions(
+            user_id=user_id
+        )
+
+        return {
+            "user_id": user_id,
+            "deleted_count": deleted_count,
+            "status": "success",
+            "message": f"Successfully deleted {deleted_count} transaction(s)"
+        }

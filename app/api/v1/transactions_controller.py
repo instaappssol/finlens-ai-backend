@@ -19,6 +19,8 @@ from app.schemas.transaction_schema import (
     UpdateCategoryRequest,
     UpdateCategoryResponse,
     CategoryTransactionsResponse,
+    DeleteTransactionResponse,
+    DeleteAllTransactionsResponse,
 )
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -272,4 +274,104 @@ async def get_category_transactions(
     except Exception as e:
         raise InternalServerErrorException(
             message="Failed to get category transactions", errors=[str(e)]
+        )
+
+
+@router.delete(
+    "/{transaction_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Delete transaction by ID",
+    description="Delete a specific transaction by its ID. User can only delete their own transactions.",
+)
+async def delete_transaction(
+    request: Request,
+    transaction_id: str,
+    service: TransactionService = Depends(get_transaction_service)
+):
+    """Delete a transaction by ID"""
+    try:
+        # Get user_id from JWT token (set by middleware)
+        user_id = None
+        if hasattr(request.state, 'user'):
+            user_id = request.state.user.get('user_id') or request.state.user.get('sub')
+        
+        if not user_id:
+            raise BadRequestException(
+                message="User authentication required",
+                errors=["User ID not found in token"]
+            )
+
+        # Delete transaction
+        result = service.delete_transaction(
+            transaction_id=transaction_id,
+            user_id=user_id
+        )
+
+        response_data = DeleteTransactionResponse(**result)
+
+        resp = ResponseBody(
+            message="Transaction deleted successfully",
+            errors=[],
+            data=response_data.model_dump(),
+        )
+        return JSONResponse(status_code=status.HTTP_200_OK, content=resp.model_dump())
+
+    except ValueError as e:
+        raise BadRequestException(
+            message="Failed to delete transaction",
+            errors=[str(e)]
+        )
+    except BadRequestException:
+        raise
+    except Exception as e:
+        raise InternalServerErrorException(
+            message="Failed to delete transaction", errors=[str(e)]
+        )
+
+
+@router.delete(
+    "/all",
+    status_code=status.HTTP_200_OK,
+    summary="Delete all user transactions",
+    description="Delete all transactions for the authenticated user. This action cannot be undone.",
+)
+async def delete_all_transactions(
+    request: Request,
+    service: TransactionService = Depends(get_transaction_service)
+):
+    """Delete all transactions for the authenticated user"""
+    try:
+        # Get user_id from JWT token (set by middleware)
+        user_id = None
+        if hasattr(request.state, 'user'):
+            user_id = request.state.user.get('user_id') or request.state.user.get('sub')
+        
+        if not user_id:
+            raise BadRequestException(
+                message="User authentication required",
+                errors=["User ID not found in token"]
+            )
+
+        # Delete all user transactions
+        result = service.delete_all_user_transactions(user_id=user_id)
+
+        response_data = DeleteAllTransactionsResponse(**result)
+
+        resp = ResponseBody(
+            message=f"Successfully deleted {result['deleted_count']} transaction(s)",
+            errors=[],
+            data=response_data.model_dump(),
+        )
+        return JSONResponse(status_code=status.HTTP_200_OK, content=resp.model_dump())
+
+    except ValueError as e:
+        raise BadRequestException(
+            message="Failed to delete transactions",
+            errors=[str(e)]
+        )
+    except BadRequestException:
+        raise
+    except Exception as e:
+        raise InternalServerErrorException(
+            message="Failed to delete transactions", errors=[str(e)]
         )

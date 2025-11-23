@@ -161,3 +161,37 @@ class TransactionRepository(ABC):
         """
         pass
 
+    @abstractmethod
+    def delete_transaction_by_id(
+        self,
+        transaction_id: str,
+        user_id: Optional[str] = None
+    ) -> bool:
+        """
+        Delete a transaction by ID.
+
+        Args:
+            transaction_id: Transaction ID to delete
+            user_id: Optional user ID to verify ownership
+
+        Returns:
+            True if transaction was deleted, False otherwise
+        """
+        pass
+
+    @abstractmethod
+    def delete_all_user_transactions(
+        self,
+        user_id: str
+    ) -> int:
+        """
+        Delete all transactions for a user.
+
+        Args:
+            user_id: User ID whose transactions should be deleted
+
+        Returns:
+            Number of transactions deleted
+        """
+        pass
+

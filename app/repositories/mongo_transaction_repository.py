@@ -369,3 +369,48 @@ class MongoTransactionRepository(TransactionRepository):
         normalized = re.sub(r"\s+", " ", normalized).strip()
         return normalized
 
+    def delete_transaction_by_id(
+        self,
+        transaction_id: str,
+        user_id: Optional[str] = None
+    ) -> bool:
+        """Delete a transaction by ID"""
+        try:
+            # Validate transaction_id
+            if not ObjectId.is_valid(transaction_id):
+                return False
+
+            # Build query
+            query = {"_id": ObjectId(transaction_id)}
+            
+            # If user_id provided, verify ownership
+            if user_id:
+                query["user_id"] = user_id
+
+            # Delete transaction
+            result = self.collection.delete_one(query)
+
+            return result.deleted_count > 0
+
+        except Exception as e:
+            print(f"Error deleting transaction: {e}")
+            return False
+
+    def delete_all_user_transactions(
+        self,
+        user_id: str
+    ) -> int:
+        """Delete all transactions for a user"""
+        try:
+            if not user_id:
+                return 0
+
+            # Delete all transactions for this user
+            result = self.collection.delete_many({"user_id": user_id})
+
+            return result.deleted_count
+
+        except Exception as e:
+            print(f"Error deleting user transactions: {e}")
+            return 0
+

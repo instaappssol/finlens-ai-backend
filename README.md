@@ -8,6 +8,7 @@ A powerful FastAPI-based backend system for intelligent transaction categorizati
 - **CSV Upload & Batch Processing**: Upload CSV files with transactions for bulk categorization
 - **User Feedback System**: Users can provide feedback on categorizations to improve future predictions
 - **Analytics Dashboard**: Get detailed analytics including inflows, outflows, and category breakdowns
+- **Transaction Management**: Delete individual transactions or all user transactions
 - **Merchant Knowledge Base**: Semantic search using vector database (Qdrant) for merchant matching
 - **JWT Authentication**: Secure user and admin authentication
 - **RESTful API**: Well-documented API with OpenAPI/Swagger documentation
@@ -245,6 +246,47 @@ GET /transactions/categories
 Authorization: Bearer <token>
 ```
 
+#### Delete Transaction by ID
+```http
+DELETE /transactions/{transaction_id}
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "message": "Transaction deleted successfully",
+  "errors": [],
+  "data": {
+    "transaction_id": "6921d182839604cffca3d75f",
+    "status": "deleted",
+    "message": "Transaction deleted successfully"
+  }
+}
+```
+
+#### Delete All User Transactions
+```http
+DELETE /transactions/all
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "message": "Successfully deleted 15 transaction(s)",
+  "errors": [],
+  "data": {
+    "user_id": "6916f5eeddd37f0806d80f0d",
+    "deleted_count": 15,
+    "status": "success",
+    "message": "Successfully deleted 15 transaction(s)"
+  }
+}
+```
+
+⚠️ **Warning**: Deleting all transactions cannot be undone. Use with caution.
+
 ### Admin Endpoints (Requires Admin Authentication)
 
 #### Admin Signup
@@ -442,6 +484,33 @@ response = requests.post(
 print(response.json())
 ```
 
+### Example 4: Delete Transaction
+
+```python
+import requests
+
+headers = {"Authorization": f"Bearer {token}"}
+response = requests.delete(
+    f"http://localhost:8000/transactions/{transaction_id}",
+    headers=headers
+)
+print(response.json())
+```
+
+### Example 5: Delete All User Transactions
+
+```python
+import requests
+
+headers = {"Authorization": f"Bearer {token}"}
+response = requests.delete(
+    "http://localhost:8000/transactions/all",
+    headers=headers
+)
+result = response.json()["data"]
+print(f"Deleted {result['deleted_count']} transactions")
+```
+
 ## 🐳 Docker Deployment
 
 ### Build Docker Image
@@ -622,6 +691,7 @@ For issues or questions:
 - ✅ User feedback system
 - ✅ Analytics dashboard
 - ✅ CSV bulk upload
+- ✅ Transaction deletion (single and bulk)
 - ✅ Merchant knowledge base
 
 ---
